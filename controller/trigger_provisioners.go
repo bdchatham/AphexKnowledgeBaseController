@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	triggersv1beta1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -184,10 +184,10 @@ func (r *KnowledgeBaseReconciler) cleanupTriggerTemplate(ctx context.Context, kb
 
 func triggerLabels(kb *platformv1alpha1.KnowledgeBase) map[string]string {
 	return map[string]string{
-		constants.LabelOrganization: kb.Spec.Organization,
-		constants.LabelManagedBy:    constants.ManagedByKnowledgeBaseController,
-		"knowledgebase":             kb.Name,
-		"app.kubernetes.io/part-of": "archon",
+		constants.LabelOrganization:   kb.Spec.Organization,
+		constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
+		"knowledgebase":               kb.Name,
+		"app.kubernetes.io/part-of":   "archon",
 		"app.kubernetes.io/component": "trigger",
 	}
 }
@@ -195,4 +195,3 @@ func triggerLabels(kb *platformv1alpha1.KnowledgeBase) map[string]string {
 func stringPtr(s string) *string {
 	return &s
 }
-

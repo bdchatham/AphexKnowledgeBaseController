@@ -2,16 +2,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -173,80 +168,17 @@ func buildGraphService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 }
 
 func (r *KnowledgeBaseReconciler) reconcileGraph(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	deploy := buildGraphDeployment(kb)
-	if err := controllerutil.SetControllerReference(kb, deploy, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on graph deployment: %w", err)
-	}
-
-	existing := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: deploy.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, deploy); err != nil {
-				return fmt.Errorf("failed to create graph deployment: %w", err)
-			}
-			logger.Info("Created Graph Deployment", "name", deploy.Name)
-		} else {
-			return fmt.Errorf("failed to get graph deployment: %w", err)
-		}
-	} else {
-		deploy.ResourceVersion = existing.ResourceVersion
-		if err := r.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update graph deployment: %w", err)
-		}
-	}
-
 	svc := buildGraphService(kb)
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on graph service: %w", err)
-	}
-
-	existingSvc := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace}, existingSvc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, svc); err != nil {
-				return fmt.Errorf("failed to create graph service: %w", err)
-			}
-			logger.Info("Created Graph Service", "name", svc.Name)
-		} else {
-			return fmt.Errorf("failed to get graph service: %w", err)
-		}
-	} else {
-		svc.ResourceVersion = existingSvc.ResourceVersion
-		svc.Spec.ClusterIP = existingSvc.Spec.ClusterIP
-		if err := r.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update graph service: %w", err)
-		}
-	}
-
-	return nil
+	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "graph")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupGraph(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Name: graphDeploymentName(kb), Namespace: kb.Namespace}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get graph deployment for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, deploy); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete graph deployment: %w", err)
-	}
-
+	deploy.Name = graphDeploymentName(kb)
+	deploy.Namespace = kb.Namespace
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: graphServiceName(kb), Namespace: kb.Namespace}, svc); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get graph service for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete graph service: %w", err)
-	}
-
-	return nil
+	svc.Name = graphServiceName(kb)
+	svc.Namespace = kb.Namespace
+	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

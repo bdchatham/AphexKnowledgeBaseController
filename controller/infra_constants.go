@@ -2,10 +2,10 @@ package controller
 
 const (
 	// Qdrant vector database
-	QdrantImage       = "qdrant/qdrant:v1.16.3"
-	QdrantHTTPPort    = 6333
-	QdrantGRPCPort    = 6334
-	QdrantStorageSize = "10Gi"
+	QdrantImage         = "qdrant/qdrant:v1.16.3"
+	QdrantHTTPPort      = 6333
+	QdrantGRPCPort      = 6334
+	QdrantStorageSize   = "10Gi"
 	QdrantMemoryRequest = "512Mi"
 	QdrantMemoryLimit   = "1Gi"
 	QdrantCPURequest    = "250m"
@@ -51,7 +51,7 @@ const (
 	InitPostgresImage = "postgres:15-alpine"
 	InitCurlImage     = "curlimages/curl:8.5.0"
 	QdrantVectorSize  = 768
-	QdrantDistance     = "Cosine"
+	QdrantDistance    = "Cosine"
 	CollectionName    = "archon-docs"
 
 	// Retrieval settings

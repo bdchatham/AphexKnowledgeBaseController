@@ -33,7 +33,7 @@ func buildInitJob(kb *platformv1alpha1.KnowledgeBase) *batchv1.Job {
 	pgHost := postgresServiceName(kb)
 	qdrantHost := qdrantServiceName(kb)
 
-	postgresCommand := fmt.Sprintf(`echo "Waiting for PostgreSQL to be ready..."
+	postgresCommand := `echo "Waiting for PostgreSQL to be ready..."
 until pg_isready; do
   echo "PostgreSQL is not ready yet..."
   sleep 2
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS document_state (
 );
 CREATE INDEX IF NOT EXISTS idx_last_checked ON document_state(last_checked);
 "
-echo "PostgreSQL schema created successfully."`)
+echo "PostgreSQL schema created successfully."`
 
 	qdrantCommand := fmt.Sprintf(`echo "Waiting for Qdrant to be ready..."
 until curl -f http://%s:%d/; do

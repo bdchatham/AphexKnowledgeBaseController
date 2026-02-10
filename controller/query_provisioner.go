@@ -2,16 +2,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -99,8 +94,8 @@ func buildQueryDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deployment
 
 func queryEnvVars(configMapName string) []corev1.EnvVar {
 	keys := []struct {
-		envName       string
-		configMapKey  string
+		envName      string
+		configMapKey string
 	}{
 		{"EMBEDDING_SERVICE_URL", "embedding_service_url"},
 		{"EMBEDDING_MODEL", "embedding_model"},
@@ -151,80 +146,17 @@ func buildQueryService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 }
 
 func (r *KnowledgeBaseReconciler) reconcileQuery(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	deploy := buildQueryDeployment(kb)
-	if err := controllerutil.SetControllerReference(kb, deploy, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on query deployment: %w", err)
-	}
-
-	existing := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: deploy.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, deploy); err != nil {
-				return fmt.Errorf("failed to create query deployment: %w", err)
-			}
-			logger.Info("Created Query Deployment", "name", deploy.Name)
-		} else {
-			return fmt.Errorf("failed to get query deployment: %w", err)
-		}
-	} else {
-		deploy.ResourceVersion = existing.ResourceVersion
-		if err := r.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update query deployment: %w", err)
-		}
-	}
-
 	svc := buildQueryService(kb)
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on query service: %w", err)
-	}
-
-	existingSvc := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace}, existingSvc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, svc); err != nil {
-				return fmt.Errorf("failed to create query service: %w", err)
-			}
-			logger.Info("Created Query Service", "name", svc.Name)
-		} else {
-			return fmt.Errorf("failed to get query service: %w", err)
-		}
-	} else {
-		svc.ResourceVersion = existingSvc.ResourceVersion
-		svc.Spec.ClusterIP = existingSvc.Spec.ClusterIP
-		if err := r.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update query service: %w", err)
-		}
-	}
-
-	return nil
+	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "query")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupQuery(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Name: queryDeploymentName(kb), Namespace: kb.Namespace}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get query deployment for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, deploy); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete query deployment: %w", err)
-	}
-
+	deploy.Name = queryDeploymentName(kb)
+	deploy.Namespace = kb.Namespace
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: queryServiceName(kb), Namespace: kb.Namespace}, svc); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get query service for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete query service: %w", err)
-	}
-
-	return nil
+	svc.Name = queryServiceName(kb)
+	svc.Namespace = kb.Namespace
+	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

@@ -1274,7 +1274,7 @@ func TestProperty_TriggerCleanupRemovesOnlyOwnedResources(t *testing.T) {
 			knowledgeBases[i] = kb
 		}
 
-		var initialObjects []client.Object
+		initialObjects := make([]client.Object, 0, 2*len(knowledgeBases))
 		for _, kb := range knowledgeBases {
 			templateName := fmt.Sprintf("%s-scip-sync-template", kb.Name)
 			triggerName := fmt.Sprintf("%s-scip-sync-trigger", kb.Name)
@@ -1286,7 +1286,9 @@ func TestProperty_TriggerCleanupRemovesOnlyOwnedResources(t *testing.T) {
 		}
 
 		scheme := runtime.NewScheme()
-		_ = triggersv1beta1.AddToScheme(scheme)
+		if err := triggersv1beta1.AddToScheme(scheme); err != nil {
+			t.Fatalf("failed to add triggers scheme: %v", err)
+		}
 
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(scheme).

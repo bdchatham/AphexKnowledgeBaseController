@@ -2,14 +2,9 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -81,51 +76,14 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 }
 
 func (r *KnowledgeBaseReconciler) reconcileExternalSecret(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	desired := buildExternalSecret(kb)
-	if err := controllerutil.SetControllerReference(kb, desired, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on external secret: %w", err)
-	}
-
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(externalSecretGVK)
-
-	err := r.Get(ctx, client.ObjectKey{Name: desired.GetName(), Namespace: desired.GetNamespace()}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create external secret: %w", err)
-			}
-			logger.Info("Created ExternalSecret", "name", desired.GetName())
-			return nil
-		}
-		return fmt.Errorf("failed to get external secret: %w", err)
-	}
-
-	desired.SetResourceVersion(existing.GetResourceVersion())
-	if err := r.Update(ctx, desired); err != nil {
-		return fmt.Errorf("failed to update external secret: %w", err)
-	}
-
-	return nil
+	return r.reconcileUnstructured(ctx, kb, desired, "external-secret")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupExternalSecret(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(externalSecretGVK)
-
-	err := r.Get(ctx, client.ObjectKey{Name: externalSecretName(kb), Namespace: kb.Namespace}, obj)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get external secret for cleanup: %w", err)
-	}
-
-	if err := r.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete external secret: %w", err)
-	}
-
-	return nil
+	obj.SetName(externalSecretName(kb))
+	obj.SetNamespace(kb.Namespace)
+	return r.deleteIfExists(ctx, obj)
 }

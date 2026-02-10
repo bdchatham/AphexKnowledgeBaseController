@@ -559,8 +559,6 @@ func (r *KnowledgeBaseReconciler) cleanupMCPServerResources(ctx context.Context,
 }
 
 func (r *KnowledgeBaseReconciler) reconcileRepositoryConfig(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("context canceled during repository config reconciliation: %w", ctx.Err())
@@ -586,30 +584,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepositoryConfig(ctx context.Context,
 		Data: repoData,
 	}
 
-	if err := controllerutil.SetControllerReference(kb, configMap, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on configmap: %w", err)
-	}
-
-	existingConfigMap := &corev1.ConfigMap{}
-	err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, existingConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, configMap); err != nil {
-				return fmt.Errorf("failed to create configmap: %w", err)
-			}
-			logger.Info("Created repository configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
-		} else {
-			return fmt.Errorf("failed to get configmap: %w", err)
-		}
-	} else {
-		configMap.ResourceVersion = existingConfigMap.ResourceVersion
-		if err := r.Update(ctx, configMap); err != nil {
-			return fmt.Errorf("failed to update configmap: %w", err)
-		}
-		logger.V(1).Info("Updated repository configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
-	}
-
-	return nil
+	return r.reconcileConfigMap(ctx, kb, configMap, "repository-config")
 }
 
 func (r *KnowledgeBaseReconciler) buildRepositoryConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {
@@ -660,8 +635,6 @@ func (r *KnowledgeBaseReconciler) cleanupRepositoryConfig(ctx context.Context, k
 }
 
 func (r *KnowledgeBaseReconciler) reconcileSourceConfig(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("context canceled during source config reconciliation: %w", ctx.Err())
@@ -687,30 +660,7 @@ func (r *KnowledgeBaseReconciler) reconcileSourceConfig(ctx context.Context, kb 
 		Data: sourceData,
 	}
 
-	if err := controllerutil.SetControllerReference(kb, configMap, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on source config configmap: %w", err)
-	}
-
-	existingConfigMap := &corev1.ConfigMap{}
-	err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, existingConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, configMap); err != nil {
-				return fmt.Errorf("failed to create source config configmap: %w", err)
-			}
-			logger.Info("Created source configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
-		} else {
-			return fmt.Errorf("failed to get source config configmap: %w", err)
-		}
-	} else {
-		configMap.ResourceVersion = existingConfigMap.ResourceVersion
-		if err := r.Update(ctx, configMap); err != nil {
-			return fmt.Errorf("failed to update source config configmap: %w", err)
-		}
-		logger.V(1).Info("Updated source configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
-	}
-
-	return nil
+	return r.reconcileConfigMap(ctx, kb, configMap, "source-config")
 }
 
 func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {
@@ -972,7 +922,7 @@ func (r *KnowledgeBaseReconciler) checkVectorStoreHealth(ctx context.Context, kb
 	logger := log.FromContext(ctx)
 
 	endpoint := fmt.Sprintf("http://qdrant.%s:6333/health", kb.Namespace)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create vector store health request", "error", err)
 		kb.Status.VectorStoreReady = false
@@ -1002,7 +952,7 @@ func (r *KnowledgeBaseReconciler) checkCodeGraphHealth(ctx context.Context, kb *
 	logger := log.FromContext(ctx)
 
 	endpoint := fmt.Sprintf("http://code-graph.%s:5432/health", kb.Namespace)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create code graph health request", "error", err)
 		kb.Status.CodeGraphReady = false

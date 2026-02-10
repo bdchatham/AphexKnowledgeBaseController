@@ -4,12 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -74,51 +70,14 @@ func buildHTTPRoute(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstructur
 }
 
 func (r *KnowledgeBaseReconciler) reconcileHTTPRoute(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	desired := buildHTTPRoute(kb)
-	if err := controllerutil.SetControllerReference(kb, desired, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on httproute: %w", err)
-	}
-
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(httpRouteGVK)
-
-	err := r.Get(ctx, client.ObjectKey{Name: desired.GetName(), Namespace: desired.GetNamespace()}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create httproute: %w", err)
-			}
-			logger.Info("Created HTTPRoute", "name", desired.GetName())
-			return nil
-		}
-		return fmt.Errorf("failed to get httproute: %w", err)
-	}
-
-	desired.SetResourceVersion(existing.GetResourceVersion())
-	if err := r.Update(ctx, desired); err != nil {
-		return fmt.Errorf("failed to update httproute: %w", err)
-	}
-
-	return nil
+	return r.reconcileUnstructured(ctx, kb, desired, "httproute")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupHTTPRoute(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(httpRouteGVK)
-
-	err := r.Get(ctx, client.ObjectKey{Name: httpRouteName(kb), Namespace: kb.Namespace}, obj)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get httproute for cleanup: %w", err)
-	}
-
-	if err := r.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete httproute: %w", err)
-	}
-
-	return nil
+	obj.SetName(httpRouteName(kb))
+	obj.SetNamespace(kb.Namespace)
+	return r.deleteIfExists(ctx, obj)
 }

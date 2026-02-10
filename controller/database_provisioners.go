@@ -2,17 +2,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -20,23 +15,23 @@ import (
 
 func qdrantLabels(kb *platformv1alpha1.KnowledgeBase) map[string]string {
 	return map[string]string{
-		constants.LabelManagedBy:       constants.ManagedByKnowledgeBaseController,
-		"knowledgebase":                kb.Name,
-		"app.kubernetes.io/name":       "qdrant",
-		"app.kubernetes.io/instance":   kb.Name,
-		"app.kubernetes.io/part-of":    "archon",
-		"app.kubernetes.io/component":  "vector-database",
+		constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
+		"knowledgebase":               kb.Name,
+		"app.kubernetes.io/name":      "qdrant",
+		"app.kubernetes.io/instance":  kb.Name,
+		"app.kubernetes.io/part-of":   "archon",
+		"app.kubernetes.io/component": "vector-database",
 	}
 }
 
 func postgresLabels(kb *platformv1alpha1.KnowledgeBase) map[string]string {
 	return map[string]string{
-		constants.LabelManagedBy:       constants.ManagedByKnowledgeBaseController,
-		"knowledgebase":                kb.Name,
-		"app.kubernetes.io/name":       "postgres",
-		"app.kubernetes.io/instance":   kb.Name,
-		"app.kubernetes.io/part-of":    "archon",
-		"app.kubernetes.io/component":  "database",
+		constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
+		"knowledgebase":               kb.Name,
+		"app.kubernetes.io/name":      "postgres",
+		"app.kubernetes.io/instance":  kb.Name,
+		"app.kubernetes.io/part-of":   "archon",
+		"app.kubernetes.io/component": "database",
 	}
 }
 
@@ -173,82 +168,19 @@ func buildQdrantService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 }
 
 func (r *KnowledgeBaseReconciler) reconcileQdrant(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	ss := buildQdrantStatefulSet(kb)
-	if err := controllerutil.SetControllerReference(kb, ss, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on qdrant statefulset: %w", err)
-	}
-
-	existing := &appsv1.StatefulSet{}
-	err := r.Get(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, ss); err != nil {
-				return fmt.Errorf("failed to create qdrant statefulset: %w", err)
-			}
-			logger.Info("Created Qdrant StatefulSet", "name", ss.Name)
-		} else {
-			return fmt.Errorf("failed to get qdrant statefulset: %w", err)
-		}
-	} else {
-		ss.ResourceVersion = existing.ResourceVersion
-		if err := r.Update(ctx, ss); err != nil {
-			return fmt.Errorf("failed to update qdrant statefulset: %w", err)
-		}
-	}
-
 	svc := buildQdrantService(kb)
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on qdrant service: %w", err)
-	}
-
-	existingSvc := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace}, existingSvc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, svc); err != nil {
-				return fmt.Errorf("failed to create qdrant service: %w", err)
-			}
-			logger.Info("Created Qdrant Service", "name", svc.Name)
-		} else {
-			return fmt.Errorf("failed to get qdrant service: %w", err)
-		}
-	} else {
-		svc.ResourceVersion = existingSvc.ResourceVersion
-		svc.Spec.ClusterIP = existingSvc.Spec.ClusterIP
-		if err := r.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update qdrant service: %w", err)
-		}
-	}
-
-	return nil
+	return r.reconcileWorkloadAndService(ctx, kb, ss, svc, "qdrant")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupQdrant(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, client.ObjectKey{Name: qdrantStatefulSetName(kb), Namespace: kb.Namespace}, ss); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get qdrant statefulset for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, ss); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete qdrant statefulset: %w", err)
-	}
-
+	ss.Name = qdrantStatefulSetName(kb)
+	ss.Namespace = kb.Namespace
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: qdrantServiceName(kb), Namespace: kb.Namespace}, svc); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get qdrant service for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete qdrant service: %w", err)
-	}
-
-	return nil
+	svc.Name = qdrantServiceName(kb)
+	svc.Namespace = kb.Namespace
+	return r.cleanupWorkloadAndService(ctx, ss, svc)
 }
 
 func buildPostgresStatefulSet(kb *platformv1alpha1.KnowledgeBase) *appsv1.StatefulSet {
@@ -400,80 +332,17 @@ func buildPostgresService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 }
 
 func (r *KnowledgeBaseReconciler) reconcilePostgres(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	ss := buildPostgresStatefulSet(kb)
-	if err := controllerutil.SetControllerReference(kb, ss, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on postgres statefulset: %w", err)
-	}
-
-	existing := &appsv1.StatefulSet{}
-	err := r.Get(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, ss); err != nil {
-				return fmt.Errorf("failed to create postgres statefulset: %w", err)
-			}
-			logger.Info("Created Postgres StatefulSet", "name", ss.Name)
-		} else {
-			return fmt.Errorf("failed to get postgres statefulset: %w", err)
-		}
-	} else {
-		ss.ResourceVersion = existing.ResourceVersion
-		if err := r.Update(ctx, ss); err != nil {
-			return fmt.Errorf("failed to update postgres statefulset: %w", err)
-		}
-	}
-
 	svc := buildPostgresService(kb)
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on postgres service: %w", err)
-	}
-
-	existingSvc := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace}, existingSvc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, svc); err != nil {
-				return fmt.Errorf("failed to create postgres service: %w", err)
-			}
-			logger.Info("Created Postgres Service", "name", svc.Name)
-		} else {
-			return fmt.Errorf("failed to get postgres service: %w", err)
-		}
-	} else {
-		svc.ResourceVersion = existingSvc.ResourceVersion
-		svc.Spec.ClusterIP = existingSvc.Spec.ClusterIP
-		if err := r.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update postgres service: %w", err)
-		}
-	}
-
-	return nil
+	return r.reconcileWorkloadAndService(ctx, kb, ss, svc, "postgres")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupPostgres(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, client.ObjectKey{Name: postgresStatefulSetName(kb), Namespace: kb.Namespace}, ss); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get postgres statefulset for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, ss); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete postgres statefulset: %w", err)
-	}
-
+	ss.Name = postgresStatefulSetName(kb)
+	ss.Namespace = kb.Namespace
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: postgresServiceName(kb), Namespace: kb.Namespace}, svc); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get postgres service for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete postgres service: %w", err)
-	}
-
-	return nil
+	svc.Name = postgresServiceName(kb)
+	svc.Namespace = kb.Namespace
+	return r.cleanupWorkloadAndService(ctx, ss, svc)
 }

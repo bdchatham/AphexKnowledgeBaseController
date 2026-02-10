@@ -2,16 +2,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
@@ -138,80 +133,17 @@ func buildEmbeddingService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 }
 
 func (r *KnowledgeBaseReconciler) reconcileEmbedding(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	logger := log.FromContext(ctx)
-
 	deploy := buildEmbeddingDeployment(kb)
-	if err := controllerutil.SetControllerReference(kb, deploy, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on embedding deployment: %w", err)
-	}
-
-	existing := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: deploy.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, deploy); err != nil {
-				return fmt.Errorf("failed to create embedding deployment: %w", err)
-			}
-			logger.Info("Created Embedding Deployment", "name", deploy.Name)
-		} else {
-			return fmt.Errorf("failed to get embedding deployment: %w", err)
-		}
-	} else {
-		deploy.ResourceVersion = existing.ResourceVersion
-		if err := r.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update embedding deployment: %w", err)
-		}
-	}
-
 	svc := buildEmbeddingService(kb)
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on embedding service: %w", err)
-	}
-
-	existingSvc := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace}, existingSvc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.Create(ctx, svc); err != nil {
-				return fmt.Errorf("failed to create embedding service: %w", err)
-			}
-			logger.Info("Created Embedding Service", "name", svc.Name)
-		} else {
-			return fmt.Errorf("failed to get embedding service: %w", err)
-		}
-	} else {
-		svc.ResourceVersion = existingSvc.ResourceVersion
-		svc.Spec.ClusterIP = existingSvc.Spec.ClusterIP
-		if err := r.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update embedding service: %w", err)
-		}
-	}
-
-	return nil
+	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "embedding")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupEmbedding(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Name: embeddingDeploymentName(kb), Namespace: kb.Namespace}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get embedding deployment for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, deploy); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete embedding deployment: %w", err)
-	}
-
+	deploy.Name = embeddingDeploymentName(kb)
+	deploy.Namespace = kb.Namespace
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: embeddingServiceName(kb), Namespace: kb.Namespace}, svc); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to get embedding service for cleanup: %w", err)
-	}
-	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete embedding service: %w", err)
-	}
-
-	return nil
+	svc.Name = embeddingServiceName(kb)
+	svc.Namespace = kb.Namespace
+	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

@@ -100,6 +100,7 @@ linters:
           - dupl
           - goconst
           - gosec
+          - gocyclo
         path: _test\.go
       - linters:
           - all
