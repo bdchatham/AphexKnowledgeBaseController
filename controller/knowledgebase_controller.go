@@ -3,11 +3,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,12 +28,20 @@ import (
 	"github.com/bdchatham/AphexControllerRuntime/pkg/metrics"
 )
 
+const healthCheckTimeout = 5 * time.Second
+
+// HTTPClient abstracts HTTP operations for testability.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // KnowledgeBaseReconciler reconciles a KnowledgeBase object
 type KnowledgeBaseReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
 	Log             logr.Logger
 	Config          *config.Config
+	HTTPClient      HTTPClient
 	statusHelper    *helpers.StatusHelper
 	finalizerHelper *helpers.FinalizerHelper
 }
@@ -138,6 +148,141 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	default:
 	}
 
+	if err := r.reconcileExternalSecret(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile external secret")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "external_secret", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("External secret provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after external secret failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "external_secret", "success")
+
+	if err := r.reconcileQdrant(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile Qdrant")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "qdrant", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Qdrant provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after Qdrant failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "qdrant", "success")
+
+	if err := r.reconcilePostgres(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile Postgres")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "postgres", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Postgres provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after Postgres failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "postgres", "success")
+
+	if err := r.reconcileInitJob(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile init job")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "init_job", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Init job provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after init job failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "init_job", "success")
+
+	if err := r.reconcileAppConfig(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile app config")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "app_config", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("App config provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after app config failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "app_config", "success")
+
+	if err := r.reconcileEmbedding(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile embedding")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "embedding", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Embedding provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after embedding failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "embedding", "success")
+
+	if err := r.reconcileQuery(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile query")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "query", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Query provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after query failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "query", "success")
+
+	if err := r.reconcileGraph(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile graph")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "graph", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Graph provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after graph failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "graph", "success")
+
+	if err := r.reconcileHTTPRoute(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile HTTP route")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "httproute", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("HTTP route provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after HTTP route failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "httproute", "success")
+
 	if err := r.reconcileRepositoryConfig(ctx, kb); err != nil {
 		logger.Error(err, "Failed to reconcile repository configuration")
 		timer.ObserveError(metrics.ClassifyError(err))
@@ -152,6 +297,69 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "repository_config", "success")
+
+	if err := r.reconcileSourceConfig(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile source configuration")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "source_config", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Source configuration failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after source config failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "source_config", "success")
+
+	if err := r.reconcileRepoMapping(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile repo mapping")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "repo_mapping", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Repo mapping reconciliation failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after repo mapping failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "repo_mapping", "success")
+
+	if err := r.reconcileTriggerTemplate(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile TriggerTemplate")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "trigger_template", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("TriggerTemplate reconciliation failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after TriggerTemplate failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "trigger_template", "success")
+
+	if err := r.reconcileTrigger(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile Trigger")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "trigger", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Trigger reconciliation failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after Trigger failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "trigger", "success")
+
+	r.checkVectorStoreHealth(ctx, kb)
+	r.checkCodeGraphHealth(ctx, kb)
 
 	select {
 	case <-ctx.Done():
@@ -185,8 +393,10 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	statusPatch := map[string]interface{}{
 		"phase":             constants.PhaseReady,
-		"message":           fmt.Sprintf("Tracking %d repositories", len(kb.Spec.Repositories)),
+		"message":           fmt.Sprintf("Tracking %d sources", len(kb.Spec.Sources)),
 		"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		"vectorStoreReady":  kb.Status.VectorStoreReady,
+		"codeGraphReady":    kb.Status.CodeGraphReady,
 	}
 
 	if kb.Spec.MCP != nil {
@@ -209,7 +419,7 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger.Info("KnowledgeBase reconciled successfully",
 		"name", kb.Name,
 		"namespace", kb.Namespace,
-		"repositories", len(kb.Spec.Repositories),
+		"sources", len(kb.Spec.Sources),
 	)
 
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
@@ -232,21 +442,30 @@ func (r *KnowledgeBaseReconciler) ensureHelpers(logger logr.Logger) error { //no
 }
 
 func (r *KnowledgeBaseReconciler) validateSpec(kb *platformv1alpha1.KnowledgeBase) error {
-	if len(kb.Spec.Repositories) == 0 {
-		return fmt.Errorf("repositories array cannot be empty")
+	if err := kb.ValidateOrganization(); err != nil {
+		return err
 	}
 
-	for i, repo := range kb.Spec.Repositories {
-		if repo.URL == "" {
-			return fmt.Errorf("repository[%d]: URL cannot be empty", i)
+	if len(kb.Spec.Sources) == 0 {
+		return fmt.Errorf("sources array cannot be empty")
+	}
+
+	for i, source := range kb.Spec.Sources {
+		if source.URL == "" {
+			return fmt.Errorf("source[%d]: URL cannot be empty", i)
 		}
 
-		if !strings.HasPrefix(repo.URL, "http://") && !strings.HasPrefix(repo.URL, "https://") {
-			return fmt.Errorf("repository[%d]: URL must start with http:// or https://", i)
+		if !strings.HasPrefix(source.URL, "http://") && !strings.HasPrefix(source.URL, "https://") {
+			return fmt.Errorf("source[%d]: URL must start with http:// or https://", i)
 		}
 
-		if repo.Branch != "" && !isValidBranchName(repo.Branch) {
-			return fmt.Errorf("repository[%d]: invalid branch name '%s'", i, repo.Branch)
+		if source.Branch != "" && !isValidBranchName(source.Branch) {
+			return fmt.Errorf("source[%d]: invalid branch name '%s'", i, source.Branch)
+		}
+
+		sourceType := defaultSourceType(source.SourceType)
+		if sourceType != "docs" && sourceType != "code" {
+			return fmt.Errorf("source[%d]: sourceType must be 'docs' or 'code', got '%s'", i, source.SourceType)
 		}
 	}
 
@@ -259,8 +478,47 @@ func (r *KnowledgeBaseReconciler) handleDeletionWithHelper(ctx context.Context, 
 	}
 
 	cleanupSteps := []helpers.CleanupStep{
+		helpers.NewCleanupStep("HTTPRoute", func(ctx context.Context) error {
+			return r.cleanupHTTPRoute(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Query service", func(ctx context.Context) error {
+			return r.cleanupQuery(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Graph service", func(ctx context.Context) error {
+			return r.cleanupGraph(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Embedding service", func(ctx context.Context) error {
+			return r.cleanupEmbedding(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Init job", func(ctx context.Context) error {
+			return r.cleanupInitJob(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Postgres", func(ctx context.Context) error {
+			return r.cleanupPostgres(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Qdrant", func(ctx context.Context) error {
+			return r.cleanupQdrant(ctx, kb)
+		}),
+		helpers.NewCleanupStep("External secret", func(ctx context.Context) error {
+			return r.cleanupExternalSecret(ctx, kb)
+		}),
+		helpers.NewCleanupStep("App config", func(ctx context.Context) error {
+			return r.cleanupAppConfig(ctx, kb)
+		}),
+		helpers.NewCleanupStep("PVCs", func(ctx context.Context) error {
+			return r.cleanupPVCs(ctx, kb)
+		}),
 		helpers.NewCleanupStep("Repository configuration", func(ctx context.Context) error {
 			return r.cleanupRepositoryConfig(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Source configuration", func(ctx context.Context) error {
+			return r.cleanupSourceConfig(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Repo mapping", func(ctx context.Context) error {
+			return r.cleanupRepoMapping(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Triggers", func(ctx context.Context) error {
+			return r.cleanupTriggers(ctx, kb)
 		}),
 		helpers.NewCleanupStep("MCP server resources", func(ctx context.Context) error {
 			return r.cleanupMCPServerResources(ctx, kb)
@@ -357,25 +615,27 @@ func (r *KnowledgeBaseReconciler) reconcileRepositoryConfig(ctx context.Context,
 func (r *KnowledgeBaseReconciler) buildRepositoryConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {
 	data := make(map[string]string)
 
-	data["displayName"] = kb.Spec.DisplayName
+	data["name"] = kb.Spec.Name
 	if kb.Spec.Description != "" {
 		data["description"] = kb.Spec.Description
 	}
 
-	data["repositoryCount"] = fmt.Sprintf("%d", len(kb.Spec.Repositories))
+	data["sourceCount"] = fmt.Sprintf("%d", len(kb.Spec.Sources))
 
-	for i, repo := range kb.Spec.Repositories {
+	for i, source := range kb.Spec.Sources {
 		prefix := fmt.Sprintf("repo.%d.", i)
-		data[prefix+"url"] = repo.URL
+		data[prefix+"url"] = source.URL
 
-		branch := repo.Branch
+		branch := source.Branch
 		if branch == "" {
 			branch = "mainline"
 		}
 		data[prefix+"branch"] = branch
 
-		if len(repo.Paths) > 0 {
-			data[prefix+"paths"] = strings.Join(repo.Paths, ",")
+		data[prefix+"sourceType"] = defaultSourceType(source.SourceType)
+
+		if len(source.Paths) > 0 {
+			data[prefix+"paths"] = strings.Join(source.Paths, ",")
 		} else {
 			data[prefix+"paths"] = ".kiro/docs"
 		}
@@ -394,6 +654,95 @@ func (r *KnowledgeBaseReconciler) cleanupRepositoryConfig(ctx context.Context, k
 		}
 	} else if !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to get repository configuration ConfigMap for cleanup: %w", err)
+	}
+
+	return nil
+}
+
+func (r *KnowledgeBaseReconciler) reconcileSourceConfig(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	logger := log.FromContext(ctx)
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context canceled during source config reconciliation: %w", ctx.Err())
+	default:
+	}
+
+	configMapName := fmt.Sprintf("%s-source-config", kb.Name)
+	sourceData := r.buildSourceConfigData(kb)
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: kb.Namespace,
+			Labels: map[string]string{
+				constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
+				"knowledgebase":               kb.Name,
+				"app.kubernetes.io/name":      "knowledgebase-source-config",
+				"app.kubernetes.io/instance":  kb.Name,
+				"app.kubernetes.io/part-of":   "archon",
+				"app.kubernetes.io/component": "config",
+			},
+		},
+		Data: sourceData,
+	}
+
+	if err := controllerutil.SetControllerReference(kb, configMap, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference on source config configmap: %w", err)
+	}
+
+	existingConfigMap := &corev1.ConfigMap{}
+	err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, existingConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			if err := r.Create(ctx, configMap); err != nil {
+				return fmt.Errorf("failed to create source config configmap: %w", err)
+			}
+			logger.Info("Created source configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
+		} else {
+			return fmt.Errorf("failed to get source config configmap: %w", err)
+		}
+	} else {
+		configMap.ResourceVersion = existingConfigMap.ResourceVersion
+		if err := r.Update(ctx, configMap); err != nil {
+			return fmt.Errorf("failed to update source config configmap: %w", err)
+		}
+		logger.V(1).Info("Updated source configuration ConfigMap", "name", configMapName, "namespace", kb.Namespace)
+	}
+
+	return nil
+}
+
+func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {
+	data := make(map[string]string)
+
+	for i, source := range kb.Spec.Sources {
+		prefix := fmt.Sprintf("source.%d.", i)
+		data[prefix+"url"] = source.URL
+		data[prefix+"sourceType"] = defaultSourceType(source.SourceType)
+
+		if len(source.Paths) > 0 {
+			data[prefix+"paths"] = strings.Join(source.Paths, ",")
+		}
+	}
+
+	if hasCodeSources(kb.Spec.Sources) {
+		data["codeGraph.endpoint"] = fmt.Sprintf("http://code-graph.%s:5432", kb.Namespace)
+	}
+
+	return data
+}
+
+func (r *KnowledgeBaseReconciler) cleanupSourceConfig(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	configMapName := fmt.Sprintf("%s-source-config", kb.Name)
+
+	configMap := &corev1.ConfigMap{}
+	if err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, configMap); err == nil {
+		if err := r.Delete(ctx, configMap); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete source configuration ConfigMap: %w", err)
+		}
+	} else if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to get source configuration ConfigMap for cleanup: %w", err)
 	}
 
 	return nil
@@ -612,6 +961,151 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 	return nil
 }
 
+func (r *KnowledgeBaseReconciler) httpClient() HTTPClient {
+	if r.HTTPClient != nil {
+		return r.HTTPClient
+	}
+	return &http.Client{Timeout: healthCheckTimeout}
+}
+
+func (r *KnowledgeBaseReconciler) checkVectorStoreHealth(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) {
+	logger := log.FromContext(ctx)
+
+	endpoint := fmt.Sprintf("http://qdrant.%s:6333/health", kb.Namespace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		logger.V(1).Info("Failed to create vector store health request", "error", err)
+		kb.Status.VectorStoreReady = false
+		return
+	}
+
+	resp, err := r.httpClient().Do(req)
+	if err != nil {
+		logger.V(1).Info("Vector store health check failed", "endpoint", endpoint, "error", err)
+		kb.Status.VectorStoreReady = false
+		return
+	}
+	defer resp.Body.Close()
+
+	kb.Status.VectorStoreReady = resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !kb.Status.VectorStoreReady {
+		logger.V(1).Info("Vector store health check returned non-2xx", "endpoint", endpoint, "status", resp.StatusCode)
+	}
+}
+
+func (r *KnowledgeBaseReconciler) checkCodeGraphHealth(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) {
+	if !hasCodeSources(kb.Spec.Sources) {
+		kb.Status.CodeGraphReady = false
+		return
+	}
+
+	logger := log.FromContext(ctx)
+
+	endpoint := fmt.Sprintf("http://code-graph.%s:5432/health", kb.Namespace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		logger.V(1).Info("Failed to create code graph health request", "error", err)
+		kb.Status.CodeGraphReady = false
+		return
+	}
+
+	resp, err := r.httpClient().Do(req)
+	if err != nil {
+		logger.V(1).Info("Code graph health check failed", "endpoint", endpoint, "error", err)
+		kb.Status.CodeGraphReady = false
+		return
+	}
+	defer resp.Body.Close()
+
+	kb.Status.CodeGraphReady = resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !kb.Status.CodeGraphReady {
+		logger.V(1).Info("Code graph health check returned non-2xx", "endpoint", endpoint, "status", resp.StatusCode)
+	}
+}
+
+func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	logger := log.FromContext(ctx)
+
+	mappingValue := fmt.Sprintf("%s/%s", kb.Name, kb.Namespace)
+
+	configMap := &corev1.ConfigMap{}
+	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to get repo mapping ConfigMap: %w", err)
+		}
+		configMap = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      repoMappingConfigMapName,
+				Namespace: repoMappingNamespace,
+				Labels: map[string]string{
+					constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
+					"app.kubernetes.io/name":      "archon-repo-mapping",
+					"app.kubernetes.io/part-of":   "archon",
+					"app.kubernetes.io/component": "event-routing",
+				},
+			},
+			Data: make(map[string]string),
+		}
+	}
+
+	if configMap.Data == nil {
+		configMap.Data = make(map[string]string)
+	}
+
+	removeEntriesForKnowledgeBase(configMap.Data, mappingValue)
+
+	for _, source := range kb.Spec.Sources {
+		configMap.Data[source.URL] = mappingValue
+	}
+
+	if err != nil {
+		if createErr := r.Create(ctx, configMap); createErr != nil {
+			return fmt.Errorf("failed to create repo mapping ConfigMap: %w", createErr)
+		}
+		logger.Info("Created repo mapping ConfigMap", "namespace", repoMappingNamespace)
+		return nil
+	}
+
+	if updateErr := r.Update(ctx, configMap); updateErr != nil {
+		return fmt.Errorf("failed to update repo mapping ConfigMap: %w", updateErr)
+	}
+	logger.V(1).Info("Updated repo mapping ConfigMap", "namespace", repoMappingNamespace, "knowledgebase", kb.Name)
+	return nil
+}
+
+func (r *KnowledgeBaseReconciler) cleanupRepoMapping(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	mappingValue := fmt.Sprintf("%s/%s", kb.Name, kb.Namespace)
+
+	configMap := &corev1.ConfigMap{}
+	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get repo mapping ConfigMap for cleanup: %w", err)
+	}
+
+	if configMap.Data == nil {
+		return nil
+	}
+
+	removeEntriesForKnowledgeBase(configMap.Data, mappingValue)
+
+	if err := r.Update(ctx, configMap); err != nil {
+		return fmt.Errorf("failed to update repo mapping ConfigMap during cleanup: %w", err)
+	}
+	return nil
+}
+
+func removeEntriesForKnowledgeBase(data map[string]string, mappingValue string) {
+	for key, value := range data {
+		if value == mappingValue {
+			delete(data, key)
+		}
+	}
+}
+
 func (r *KnowledgeBaseReconciler) cleanupMCPServer(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	logger := log.FromContext(ctx)
 
@@ -656,8 +1150,10 @@ func (r *KnowledgeBaseReconciler) SetupWithManagerAndOptions(mgr ctrl.Manager, o
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&platformv1alpha1.KnowledgeBase{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&batchv1.Job{}).
 		WithOptions(*opts).
 		Complete(r)
 }

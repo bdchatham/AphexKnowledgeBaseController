@@ -3,6 +3,11 @@ kind: ServiceAccount
 metadata:
   name: knowledgebase-controller
   namespace: platform-system
+  labels:
+    app: knowledgebase-controller
+    app.kubernetes.io/name: knowledgebase-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: aphex-platform
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -61,6 +66,63 @@ rules:
       - patch
       - delete
   - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - httproutes
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+      - delete
+  - apiGroups:
       - coordination.k8s.io
     resources:
       - leases
@@ -72,6 +134,33 @@ rules:
       - update
       - patch
       - delete
+  - apiGroups:
+      - aphex.io
+    resources:
+      - organizations
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - triggers.tekton.dev
+    resources:
+      - triggers
+      - triggertemplates
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - triggers.tekton.dev
+    resources:
+      - triggerbindings
+    verbs:
+      - get
+      - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -85,3 +174,16 @@ subjects:
   - kind: ServiceAccount
     name: knowledgebase-controller
     namespace: platform-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knowledgebase-trigger-manager
+rules:
+  - apiGroups: ["triggers.tekton.dev"]
+    resources: ["triggers", "triggertemplates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["triggers.tekton.dev"]
+    resources: ["triggerbindings"]
+    verbs: ["get", "list"]

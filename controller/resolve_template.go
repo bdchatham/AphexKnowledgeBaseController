@@ -1,0 +1,42 @@
+package controller
+
+import "fmt"
+
+// buildResolveAndTriggerTaskRun creates the JSON for the resolve-and-trigger
+// TaskRun resource template. This TaskRun reads the archon-repo-mapping
+// ConfigMap to find the KnowledgeBase for a pushed repository, checks for
+// active runs, and creates the actual scip-sync TaskRun.
+func buildResolveAndTriggerTaskRun(namespace string) []byte {
+	return []byte(fmt.Sprintf(`{
+  "apiVersion": "tekton.dev/v1",
+  "kind": "TaskRun",
+  "metadata": {
+    "generateName": "scip-sync-resolve-",
+    "namespace": %q,
+    "labels": {
+      "app.kubernetes.io/name": "scip-sync",
+      "app.kubernetes.io/part-of": "archon",
+      "app.kubernetes.io/component": "resolve"
+    }
+  },
+  "spec": {
+    "serviceAccountName": "pipeline-runner",
+    "timeout": "5m",
+    "taskSpec": {
+      "params": [
+        {"name": "repo-url", "type": "string"}
+      ],
+      "steps": [
+        {
+          "name": "resolve-and-trigger",
+          "image": "bitnami/kubectl:1.28",
+          "script": "#!/bin/bash\nset -euo pipefail\n\nREPO_URL=\"$(params.repo-url)\"\necho \"Resolving KnowledgeBase for repo: ${REPO_URL}\"\n\nMAPPING=$(kubectl get configmap archon-repo-mapping \\\n  -n archon \\\n  -o jsonpath=\"{.data['${REPO_URL}']}\" 2>/dev/null || true)\n\nif [ -z \"${MAPPING}\" ]; then\n  echo \"No KnowledgeBase mapping found for ${REPO_URL}, skipping\"\n  exit 0\nfi\n\nKB_NAME=$(echo \"${MAPPING}\" | cut -d'/' -f1)\nKB_NAMESPACE=$(echo \"${MAPPING}\" | cut -d'/' -f2)\necho \"Resolved to KnowledgeBase: ${KB_NAME} in ${KB_NAMESPACE}\"\n\nEXISTING=$(kubectl get taskrun \\\n  -n \"${KB_NAMESPACE}\" \\\n  -l \"tekton.dev/pipeline=${KB_NAME}\" \\\n  --field-selector=status.conditions[0].status!=True \\\n  --no-headers 2>/dev/null | wc -l || echo \"0\")\n\nif [ \"${EXISTING}\" -gt 0 ]; then\n  echo \"WARNING: Active sync already running for ${KB_NAME}, dropping event\"\n  exit 0\nfi\n\ncat <<EOF | kubectl create -f -\napiVersion: tekton.dev/v1\nkind: TaskRun\nmetadata:\n  generateName: scip-sync-\n  namespace: ${KB_NAMESPACE}\n  labels:\n    app.kubernetes.io/name: scip-sync\n    app.kubernetes.io/part-of: archon\n    app.kubernetes.io/component: sync\n    tekton.dev/pipeline: ${KB_NAME}\nspec:\n  serviceAccountName: pipeline-runner\n  timeout: 1h\n  taskRef:\n    resolver: cluster\n    params:\n      - name: kind\n        value: task\n      - name: name\n        value: scip-sync\n      - name: namespace\n        value: archon\n  params:\n    - name: kb-name\n      value: ${KB_NAME}\n    - name: kb-namespace\n      value: ${KB_NAMESPACE}\n    - name: workspace-name\n      value: ${KB_NAME}\n  workspaces:\n    - name: shared-data\n      emptyDir: {}\nEOF\n\necho \"Created scip-sync TaskRun for ${KB_NAME}\""
+        }
+      ]
+    },
+    "params": [
+      {"name": "repo-url", "value": "$(tt.params.repo-url)"}
+    ]
+  }
+}`, namespace))
+}

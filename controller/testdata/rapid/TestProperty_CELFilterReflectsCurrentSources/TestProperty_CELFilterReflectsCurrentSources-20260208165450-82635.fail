@@ -1,0 +1,41 @@
+# 2026/02/08 16:54:50.985195 [TestProperty_CELFilterReflectsCurrentSources] [rapid] draw oldSourceCount: 1
+# 2026/02/08 16:54:50.985198 [TestProperty_CELFilterReflectsCurrentSources] [rapid] draw newSourceCount: 1
+# 2026/02/08 16:54:50.985200 [TestProperty_CELFilterReflectsCurrentSources] [rapid] draw old_repo_0: "a--"
+# 2026/02/08 16:54:50.985201 [TestProperty_CELFilterReflectsCurrentSources] [rapid] draw new_repo_0: "a---"
+# 2026/02/08 16:54:50.985202 [TestProperty_CELFilterReflectsCurrentSources] new CEL filter "body.repository.clone_url == 'https://github.com/org/a---'" still contains removed URL "https://github.com/org/a--"
+# 
+v0.4.8#7097028013070088108
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x5555555555555
+0x0
+0x0
+0x0
+0x0
