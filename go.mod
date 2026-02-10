@@ -2,10 +2,8 @@ module github.com/bdchatham/AphexKnowledgeBaseController
 
 go 1.25.1
 
-replace github.com/bdchatham/AphexControllerRuntime => ../AphexControllerRuntime
-
 require (
-	github.com/bdchatham/AphexControllerRuntime v0.1.0
+	github.com/bdchatham/AphexControllerRuntime v0.2.0
 	github.com/go-logr/logr v1.4.3
 	github.com/tektoncd/triggers v0.34.0
 	k8s.io/api v0.34.1
