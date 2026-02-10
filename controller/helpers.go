@@ -12,6 +12,10 @@ import (
 const (
 	repoMappingNamespace     = "archon"
 	repoMappingConfigMapName = "archon-repo-mapping"
+
+	sourceTypeDocs    = "docs"
+	sourceTypeCode    = "code"
+	defaultSourcePath = ".kiro/docs"
 )
 
 // orgNamespace returns the organization namespace for a KnowledgeBase.
@@ -61,7 +65,7 @@ func isValidBranchName(branch string) bool {
 // with existing KnowledgeBase resources that predate the sourceType field.
 func defaultSourceType(sourceType string) string {
 	if sourceType == "" {
-		return "docs"
+		return sourceTypeDocs
 	}
 	return sourceType
 }
@@ -70,7 +74,7 @@ func defaultSourceType(sourceType string) string {
 // Used to determine whether code graph configuration should be included.
 func hasCodeSources(sources []platformv1alpha1.Source) bool {
 	for _, source := range sources {
-		if defaultSourceType(source.SourceType) == "code" {
+		if defaultSourceType(source.SourceType) == sourceTypeCode {
 			return true
 		}
 	}

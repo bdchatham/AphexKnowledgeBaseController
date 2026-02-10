@@ -464,7 +464,7 @@ func (r *KnowledgeBaseReconciler) validateSpec(kb *platformv1alpha1.KnowledgeBas
 		}
 
 		sourceType := defaultSourceType(source.SourceType)
-		if sourceType != "docs" && sourceType != "code" {
+		if sourceType != sourceTypeDocs && sourceType != sourceTypeCode {
 			return fmt.Errorf("source[%d]: sourceType must be 'docs' or 'code', got '%s'", i, source.SourceType)
 		}
 	}
@@ -612,7 +612,7 @@ func (r *KnowledgeBaseReconciler) buildRepositoryConfigData(kb *platformv1alpha1
 		if len(source.Paths) > 0 {
 			data[prefix+"paths"] = strings.Join(source.Paths, ",")
 		} else {
-			data[prefix+"paths"] = ".kiro/docs"
+			data[prefix+"paths"] = defaultSourcePath
 		}
 	}
 
