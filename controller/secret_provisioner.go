@@ -34,7 +34,7 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(externalSecretGVK)
 	obj.SetName(name)
-	obj.SetNamespace(kb.Namespace)
+	obj.SetNamespace(infraNamespace(kb))
 	obj.SetLabels(externalSecretLabels(kb))
 
 	obj.Object["spec"] = map[string]interface{}{
@@ -84,6 +84,6 @@ func (r *KnowledgeBaseReconciler) cleanupExternalSecret(ctx context.Context, kb 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(externalSecretGVK)
 	obj.SetName(externalSecretName(kb))
-	obj.SetNamespace(kb.Namespace)
+	obj.SetNamespace(infraNamespace(kb))
 	return r.deleteIfExists(ctx, obj)
 }

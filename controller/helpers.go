@@ -1,12 +1,19 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
+	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -18,10 +25,60 @@ const (
 	defaultSourcePath = ".kiro/docs"
 )
 
-// orgNamespace returns the organization namespace for a KnowledgeBase.
-// Delegates to the KnowledgeBase type's OrgNamespace() method.
 func orgNamespace(kb *platformv1alpha1.KnowledgeBase) string {
 	return kb.OrgNamespace()
+}
+
+func infraNamespace(kb *platformv1alpha1.KnowledgeBase) string {
+	return fmt.Sprintf("kb-%s", kb.Name)
+}
+
+func (r *KnowledgeBaseReconciler) reconcileNamespace(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	ns := &corev1.Namespace{}
+	nsName := infraNamespace(kb)
+
+	err := r.Get(ctx, client.ObjectKey{Name: nsName}, ns)
+	if err == nil {
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to get namespace %s: %w", nsName, err)
+	}
+
+	ns = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nsName,
+			Labels: map[string]string{
+				constants.LabelOrganization: kb.Spec.Organization,
+				constants.LabelManagedBy:    constants.ManagedByKnowledgeBaseController,
+				"knowledgebase":             kb.Name,
+			},
+		},
+	}
+	if err := r.Create(ctx, ns); err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", nsName, err)
+	}
+
+	logger := log.FromContext(ctx)
+	logger.Info("Created infrastructure namespace", "namespace", nsName)
+	return nil
+}
+
+func (r *KnowledgeBaseReconciler) cleanupNamespace(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	ns := &corev1.Namespace{}
+	nsName := infraNamespace(kb)
+
+	if err := r.Get(ctx, client.ObjectKey{Name: nsName}, ns); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get namespace %s for cleanup: %w", nsName, err)
+	}
+
+	if err := r.Delete(ctx, ns); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete namespace %s: %w", nsName, err)
+	}
+	return nil
 }
 
 // mustParseQuantity parses a resource quantity string and panics on error.

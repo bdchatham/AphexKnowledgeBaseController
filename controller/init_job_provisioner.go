@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
@@ -73,7 +72,7 @@ echo "Qdrant collection created successfully."`,
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      initJobName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
@@ -142,7 +141,7 @@ func (r *KnowledgeBaseReconciler) reconcileInitJob(ctx context.Context, kb *plat
 	jobName := initJobName(kb)
 
 	existing := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: kb.Namespace}, existing)
+	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: infraNamespace(kb)}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return r.createInitJob(ctx, kb)
@@ -174,10 +173,6 @@ func (r *KnowledgeBaseReconciler) createInitJob(ctx context.Context, kb *platfor
 	logger := log.FromContext(ctx)
 
 	job := buildInitJob(kb)
-	if err := controllerutil.SetControllerReference(kb, job, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on init job: %w", err)
-	}
-
 	if err := r.Create(ctx, job); err != nil {
 		return fmt.Errorf("failed to create init job: %w", err)
 	}
@@ -188,7 +183,7 @@ func (r *KnowledgeBaseReconciler) createInitJob(ctx context.Context, kb *platfor
 
 func (r *KnowledgeBaseReconciler) cleanupInitJob(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	job := &batchv1.Job{}
-	if err := r.Get(ctx, client.ObjectKey{Name: initJobName(kb), Namespace: kb.Namespace}, job); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: initJobName(kb), Namespace: infraNamespace(kb)}, job); err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}

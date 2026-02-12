@@ -32,7 +32,7 @@ func buildGraphDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deployment
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      graphDeploymentName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -149,7 +149,7 @@ func buildGraphService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      graphServiceName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -176,9 +176,9 @@ func (r *KnowledgeBaseReconciler) reconcileGraph(ctx context.Context, kb *platfo
 func (r *KnowledgeBaseReconciler) cleanupGraph(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
 	deploy.Name = graphDeploymentName(kb)
-	deploy.Namespace = kb.Namespace
+	deploy.Namespace = infraNamespace(kb)
 	svc := &corev1.Service{}
 	svc.Name = graphServiceName(kb)
-	svc.Namespace = kb.Namespace
+	svc.Namespace = infraNamespace(kb)
 	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

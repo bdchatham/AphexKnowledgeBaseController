@@ -18,7 +18,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
@@ -140,6 +139,20 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 	}
+
+	if err := r.reconcileNamespace(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile infrastructure namespace")
+		timer.ObserveError(metrics.ClassifyError(err))
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Namespace provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after namespace failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "namespace", "success")
 
 	select {
 	case <-ctx.Done():
@@ -523,6 +536,9 @@ func (r *KnowledgeBaseReconciler) handleDeletionWithHelper(ctx context.Context, 
 		helpers.NewCleanupStep("MCP server resources", func(ctx context.Context) error {
 			return r.cleanupMCPServerResources(ctx, kb)
 		}),
+		helpers.NewCleanupStep("Infrastructure namespace", func(ctx context.Context) error {
+			return r.cleanupNamespace(ctx, kb)
+		}),
 	}
 
 	if err := r.finalizerHelper.HandleDeletionWithSteps(ctx, kb, cleanupSteps); err != nil {
@@ -538,7 +554,7 @@ func (r *KnowledgeBaseReconciler) cleanupMCPServerResources(ctx context.Context,
 	serviceName := fmt.Sprintf("mcp-server-%s", kb.Name)
 
 	deployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: kb.Namespace}, deployment); err == nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: infraNamespace(kb)}, deployment); err == nil {
 		if err := r.Delete(ctx, deployment); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete MCP server deployment: %w", err)
 		}
@@ -547,7 +563,7 @@ func (r *KnowledgeBaseReconciler) cleanupMCPServerResources(ctx context.Context,
 	}
 
 	service := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: kb.Namespace}, service); err == nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: infraNamespace(kb)}, service); err == nil {
 		if err := r.Delete(ctx, service); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete MCP server service: %w", err)
 		}
@@ -571,7 +587,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepositoryConfig(ctx context.Context,
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels: map[string]string{
 				constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
 				"knowledgebase":               kb.Name,
@@ -623,7 +639,7 @@ func (r *KnowledgeBaseReconciler) cleanupRepositoryConfig(ctx context.Context, k
 	configMapName := fmt.Sprintf("%s-repos", kb.Name)
 
 	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, configMap); err == nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: infraNamespace(kb)}, configMap); err == nil {
 		if err := r.Delete(ctx, configMap); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete repository configuration ConfigMap: %w", err)
 		}
@@ -647,7 +663,7 @@ func (r *KnowledgeBaseReconciler) reconcileSourceConfig(ctx context.Context, kb 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels: map[string]string{
 				constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
 				"knowledgebase":               kb.Name,
@@ -677,7 +693,7 @@ func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.Kno
 	}
 
 	if hasCodeSources(kb.Spec.Sources) {
-		data["codeGraph.endpoint"] = fmt.Sprintf("http://code-graph.%s:5432", kb.Namespace)
+		data["codeGraph.endpoint"] = fmt.Sprintf("http://code-graph.%s:5432", infraNamespace(kb))
 	}
 
 	return data
@@ -687,7 +703,7 @@ func (r *KnowledgeBaseReconciler) cleanupSourceConfig(ctx context.Context, kb *p
 	configMapName := fmt.Sprintf("%s-source-config", kb.Name)
 
 	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: kb.Namespace}, configMap); err == nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: infraNamespace(kb)}, configMap); err == nil {
 		if err := r.Delete(ctx, configMap); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete source configuration ConfigMap: %w", err)
 		}
@@ -712,7 +728,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 
 	queryServiceURL := kb.Spec.MCP.QueryServiceURL
 	if queryServiceURL == "" {
-		queryServiceURL = fmt.Sprintf("http://query.%s:8080", kb.Namespace)
+		queryServiceURL = fmt.Sprintf("http://query.%s:8080", infraNamespace(kb))
 	}
 
 	replicas := kb.Spec.MCP.Replicas
@@ -726,7 +742,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels: map[string]string{
 				constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
 				"app":                         "mcp-server",
@@ -817,18 +833,14 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(kb, deployment, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on deployment: %w", err)
-	}
-
 	existingDeployment := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: kb.Namespace}, existingDeployment)
+	err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: infraNamespace(kb)}, existingDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			if err := r.Create(ctx, deployment); err != nil {
 				return fmt.Errorf("failed to create deployment: %w", err)
 			}
-			logger.Info("Created MCP server deployment", "name", deploymentName, "namespace", kb.Namespace)
+			logger.Info("Created MCP server deployment", "name", deploymentName, "namespace", infraNamespace(kb))
 		} else {
 			return fmt.Errorf("failed to get deployment: %w", err)
 		}
@@ -837,7 +849,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 		if err := r.Update(ctx, deployment); err != nil {
 			return fmt.Errorf("failed to update deployment: %w", err)
 		}
-		logger.V(1).Info("Updated MCP server deployment", "name", deploymentName, "namespace", kb.Namespace)
+		logger.V(1).Info("Updated MCP server deployment", "name", deploymentName, "namespace", infraNamespace(kb))
 	}
 
 	select {
@@ -849,7 +861,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels: map[string]string{
 				constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
 				"app":                         "mcp-server",
@@ -877,18 +889,14 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(kb, service, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on service: %w", err)
-	}
-
 	existingService := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: kb.Namespace}, existingService)
+	err = r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: infraNamespace(kb)}, existingService)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			if err := r.Create(ctx, service); err != nil {
 				return fmt.Errorf("failed to create service: %w", err)
 			}
-			logger.Info("Created MCP server service", "name", serviceName, "namespace", kb.Namespace)
+			logger.Info("Created MCP server service", "name", serviceName, "namespace", infraNamespace(kb))
 		} else {
 			return fmt.Errorf("failed to get service: %w", err)
 		}
@@ -898,12 +906,12 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 		if err := r.Update(ctx, service); err != nil {
 			return fmt.Errorf("failed to update service: %w", err)
 		}
-		logger.V(1).Info("Updated MCP server service", "name", serviceName, "namespace", kb.Namespace)
+		logger.V(1).Info("Updated MCP server service", "name", serviceName, "namespace", infraNamespace(kb))
 	}
 
 	kb.Status.MCP.Deployed = true
 	kb.Status.MCP.ServiceName = serviceName
-	kb.Status.MCP.ServiceURL = fmt.Sprintf("http://%s.%s:%d", serviceName, kb.Namespace, port)
+	kb.Status.MCP.ServiceURL = fmt.Sprintf("http://%s.%s:%d", serviceName, infraNamespace(kb), port)
 	if existingDeployment.Status.ReadyReplicas > 0 {
 		kb.Status.MCP.ReadyReplicas = existingDeployment.Status.ReadyReplicas
 	}
@@ -921,7 +929,7 @@ func (r *KnowledgeBaseReconciler) httpClient() HTTPClient {
 func (r *KnowledgeBaseReconciler) checkVectorStoreHealth(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) {
 	logger := log.FromContext(ctx)
 
-	endpoint := fmt.Sprintf("http://qdrant.%s:6333/health", kb.Namespace)
+	endpoint := fmt.Sprintf("http://qdrant.%s:6333/health", infraNamespace(kb))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create vector store health request", "error", err)
@@ -951,7 +959,7 @@ func (r *KnowledgeBaseReconciler) checkCodeGraphHealth(ctx context.Context, kb *
 
 	logger := log.FromContext(ctx)
 
-	endpoint := fmt.Sprintf("http://code-graph.%s:5432/health", kb.Namespace)
+	endpoint := fmt.Sprintf("http://code-graph.%s:5432/health", infraNamespace(kb))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create code graph health request", "error", err)
@@ -976,7 +984,7 @@ func (r *KnowledgeBaseReconciler) checkCodeGraphHealth(ctx context.Context, kb *
 func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	logger := log.FromContext(ctx)
 
-	mappingValue := fmt.Sprintf("%s/%s", kb.Name, kb.Namespace)
+	mappingValue := fmt.Sprintf("%s/%s", kb.Name, infraNamespace(kb))
 
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
@@ -1025,7 +1033,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 }
 
 func (r *KnowledgeBaseReconciler) cleanupRepoMapping(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
-	mappingValue := fmt.Sprintf("%s/%s", kb.Name, kb.Namespace)
+	mappingValue := fmt.Sprintf("%s/%s", kb.Name, infraNamespace(kb))
 
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
@@ -1063,23 +1071,23 @@ func (r *KnowledgeBaseReconciler) cleanupMCPServer(ctx context.Context, kb *plat
 	serviceName := fmt.Sprintf("mcp-server-%s", kb.Name)
 
 	deployment := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: kb.Namespace}, deployment)
+	err := r.Get(ctx, client.ObjectKey{Name: deploymentName, Namespace: infraNamespace(kb)}, deployment)
 	if err == nil {
 		if err := r.Delete(ctx, deployment); err != nil {
 			return fmt.Errorf("failed to delete deployment: %w", err)
 		}
-		logger.Info("Deleted MCP server deployment", "name", deploymentName, "namespace", kb.Namespace)
+		logger.Info("Deleted MCP server deployment", "name", deploymentName, "namespace", infraNamespace(kb))
 	} else if !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to get deployment for cleanup: %w", err)
 	}
 
 	service := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: kb.Namespace}, service)
+	err = r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: infraNamespace(kb)}, service)
 	if err == nil {
 		if err := r.Delete(ctx, service); err != nil {
 			return fmt.Errorf("failed to delete service: %w", err)
 		}
-		logger.Info("Deleted MCP server service", "name", serviceName, "namespace", kb.Namespace)
+		logger.Info("Deleted MCP server service", "name", serviceName, "namespace", infraNamespace(kb))
 	} else if !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to get service for cleanup: %w", err)
 	}

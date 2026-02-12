@@ -6,7 +6,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
@@ -26,18 +25,10 @@ func (r *KnowledgeBaseReconciler) reconcileWorkloadAndService(
 ) error {
 	logger := log.FromContext(ctx)
 
-	if err := controllerutil.SetControllerReference(kb, workload, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on %s workload: %w", componentName, err)
-	}
-
 	if err := r.upsertObject(ctx, workload); err != nil {
 		return err
 	}
 	logger.Info(fmt.Sprintf("Reconciled %s workload", componentName), "name", workload.GetName())
-
-	if err := controllerutil.SetControllerReference(kb, svc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on %s service: %w", componentName, err)
-	}
 
 	return r.upsertService(ctx, svc)
 }
@@ -90,10 +81,6 @@ func (r *KnowledgeBaseReconciler) reconcileUnstructured(
 ) error {
 	logger := log.FromContext(ctx)
 
-	if err := controllerutil.SetControllerReference(kb, desired, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on %s: %w", componentName, err)
-	}
-
 	if err := r.upsertObject(ctx, desired); err != nil {
 		return err
 	}
@@ -137,10 +124,6 @@ func (r *KnowledgeBaseReconciler) reconcileConfigMap(
 	configMap *corev1.ConfigMap,
 	componentName string,
 ) error {
-	if err := controllerutil.SetControllerReference(kb, configMap, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on %s configmap: %w", componentName, err)
-	}
-
 	if err := r.upsertObject(ctx, configMap); err != nil {
 		return err
 	}

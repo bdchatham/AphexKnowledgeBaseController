@@ -31,7 +31,7 @@ func buildQueryDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deployment
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      queryDeploymentName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -127,7 +127,7 @@ func buildQueryService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      queryServiceName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -154,9 +154,9 @@ func (r *KnowledgeBaseReconciler) reconcileQuery(ctx context.Context, kb *platfo
 func (r *KnowledgeBaseReconciler) cleanupQuery(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
 	deploy.Name = queryDeploymentName(kb)
-	deploy.Namespace = kb.Namespace
+	deploy.Namespace = infraNamespace(kb)
 	svc := &corev1.Service{}
 	svc.Name = queryServiceName(kb)
-	svc.Namespace = kb.Namespace
+	svc.Namespace = infraNamespace(kb)
 	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

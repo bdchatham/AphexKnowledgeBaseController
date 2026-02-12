@@ -31,7 +31,7 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      embeddingDeploymentName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -114,7 +114,7 @@ func buildEmbeddingService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      embeddingServiceName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -141,9 +141,9 @@ func (r *KnowledgeBaseReconciler) reconcileEmbedding(ctx context.Context, kb *pl
 func (r *KnowledgeBaseReconciler) cleanupEmbedding(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := &appsv1.Deployment{}
 	deploy.Name = embeddingDeploymentName(kb)
-	deploy.Namespace = kb.Namespace
+	deploy.Namespace = infraNamespace(kb)
 	svc := &corev1.Service{}
 	svc.Name = embeddingServiceName(kb)
-	svc.Namespace = kb.Namespace
+	svc.Namespace = infraNamespace(kb)
 	return r.cleanupWorkloadAndService(ctx, deploy, svc)
 }

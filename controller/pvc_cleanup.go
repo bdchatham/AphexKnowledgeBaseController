@@ -17,7 +17,7 @@ func (r *KnowledgeBaseReconciler) cleanupPVCs(ctx context.Context, kb *platformv
 
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	listOpts := []client.ListOption{
-		client.InNamespace(kb.Namespace),
+		client.InNamespace(infraNamespace(kb)),
 		client.MatchingLabels{"knowledgebase": kb.Name},
 	}
 

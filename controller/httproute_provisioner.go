@@ -32,7 +32,7 @@ func buildHTTPRoute(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstructur
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(httpRouteGVK)
 	obj.SetName(httpRouteName(kb))
-	obj.SetNamespace(kb.Namespace)
+	obj.SetNamespace(infraNamespace(kb))
 	obj.SetLabels(httpRouteLabels(kb))
 
 	obj.Object["spec"] = map[string]interface{}{
@@ -78,6 +78,6 @@ func (r *KnowledgeBaseReconciler) cleanupHTTPRoute(ctx context.Context, kb *plat
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(httpRouteGVK)
 	obj.SetName(httpRouteName(kb))
-	obj.SetNamespace(kb.Namespace)
+	obj.SetNamespace(infraNamespace(kb))
 	return r.deleteIfExists(ctx, obj)
 }

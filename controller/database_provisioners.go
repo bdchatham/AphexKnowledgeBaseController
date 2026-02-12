@@ -42,7 +42,7 @@ func buildQdrantStatefulSet(kb *platformv1alpha1.KnowledgeBase) *appsv1.Stateful
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      qdrantStatefulSetName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -143,7 +143,7 @@ func buildQdrantService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      qdrantServiceName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -176,10 +176,10 @@ func (r *KnowledgeBaseReconciler) reconcileQdrant(ctx context.Context, kb *platf
 func (r *KnowledgeBaseReconciler) cleanupQdrant(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := &appsv1.StatefulSet{}
 	ss.Name = qdrantStatefulSetName(kb)
-	ss.Namespace = kb.Namespace
+	ss.Namespace = infraNamespace(kb)
 	svc := &corev1.Service{}
 	svc.Name = qdrantServiceName(kb)
-	svc.Namespace = kb.Namespace
+	svc.Namespace = infraNamespace(kb)
 	return r.cleanupWorkloadAndService(ctx, ss, svc)
 }
 
@@ -191,7 +191,7 @@ func buildPostgresStatefulSet(kb *platformv1alpha1.KnowledgeBase) *appsv1.Statef
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      postgresStatefulSetName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -313,7 +313,7 @@ func buildPostgresService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      postgresServiceName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -340,9 +340,9 @@ func (r *KnowledgeBaseReconciler) reconcilePostgres(ctx context.Context, kb *pla
 func (r *KnowledgeBaseReconciler) cleanupPostgres(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := &appsv1.StatefulSet{}
 	ss.Name = postgresStatefulSetName(kb)
-	ss.Namespace = kb.Namespace
+	ss.Namespace = infraNamespace(kb)
 	svc := &corev1.Service{}
 	svc.Name = postgresServiceName(kb)
-	svc.Namespace = kb.Namespace
+	svc.Namespace = infraNamespace(kb)
 	return r.cleanupWorkloadAndService(ctx, ss, svc)
 }

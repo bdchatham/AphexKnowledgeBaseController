@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
@@ -30,7 +29,7 @@ func buildAppConfigMap(kb *platformv1alpha1.KnowledgeBase) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appConfigMapName(kb),
-			Namespace: kb.Namespace,
+			Namespace: infraNamespace(kb),
 			Labels:    appConfigLabels(kb),
 		},
 		Data: map[string]string{
@@ -50,9 +49,6 @@ func (r *KnowledgeBaseReconciler) reconcileAppConfig(ctx context.Context, kb *pl
 	logger := log.FromContext(ctx)
 
 	configMap := buildAppConfigMap(kb)
-	if err := controllerutil.SetControllerReference(kb, configMap, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on app configmap: %w", err)
-	}
 
 	existing := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{Name: configMap.Name, Namespace: configMap.Namespace}, existing)
@@ -77,7 +73,7 @@ func (r *KnowledgeBaseReconciler) reconcileAppConfig(ctx context.Context, kb *pl
 
 func (r *KnowledgeBaseReconciler) cleanupAppConfig(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, client.ObjectKey{Name: appConfigMapName(kb), Namespace: kb.Namespace}, configMap); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: appConfigMapName(kb), Namespace: infraNamespace(kb)}, configMap); err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
