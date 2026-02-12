@@ -374,7 +374,7 @@ func TestBuildSourceConfigData_IncludesCodeGraphEndpointWhenCodeSourcePresent(t 
 
 	data := r.buildSourceConfigData(kb)
 
-	expected := "http://code-graph.archon:5432"
+	expected := "http://code-graph.kb-test-kb:5432"
 	if data["codeGraph.endpoint"] != expected {
 		t.Fatalf("expected codeGraph.endpoint=%q, got %q", expected, data["codeGraph.endpoint"])
 	}
@@ -888,7 +888,7 @@ func TestOrgNamespace_DelegatesToKBMethod(t *testing.T) {
 func TestProperty_RepoMappingProducesCorrectEntries(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		kb := knowledgeBaseGenerator().Draw(t, "knowledgeBase")
-		mappingValue := fmt.Sprintf("%s/%s", kb.Name, kb.Namespace)
+		mappingValue := fmt.Sprintf("%s/%s", kb.Name, fmt.Sprintf("kb-%s", kb.Name))
 
 		data := make(map[string]string)
 		for _, source := range kb.Spec.Sources {
@@ -911,7 +911,7 @@ func TestProperty_RepoMappingProducesCorrectEntries(t *testing.T) {
 			}
 		}
 
-		expectedFormat := kb.Name + "/" + kb.Namespace
+		expectedFormat := kb.Name + "/kb-" + kb.Name
 		if mappingValue != expectedFormat {
 			t.Fatalf("mapping value format mismatch: expected %q, got %q", expectedFormat, mappingValue)
 		}
@@ -1369,8 +1369,8 @@ func TestProperty_QdrantBuilderCorrectness(t *testing.T) {
 		if ss.Name != expectedName {
 			t.Fatalf("StatefulSet name: expected %q, got %q", expectedName, ss.Name)
 		}
-		if ss.Namespace != kb.Namespace {
-			t.Fatalf("StatefulSet namespace: expected %q, got %q", kb.Namespace, ss.Namespace)
+		if ss.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("StatefulSet namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), ss.Namespace)
 		}
 
 		// Container image
@@ -1496,8 +1496,8 @@ func TestProperty_InitJobBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Job namespace matches KB namespace
-		if job.Namespace != kb.Namespace {
-			t.Fatalf("Job namespace: expected %q, got %q", kb.Namespace, job.Namespace)
+		if job.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("Job namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), job.Namespace)
 		}
 
 		// 3. Has exactly 2 containers
@@ -1600,8 +1600,8 @@ func TestProperty_PostgresBuilderCorrectness(t *testing.T) {
 		if ss.Name != expectedName {
 			t.Fatalf("StatefulSet name: expected %q, got %q", expectedName, ss.Name)
 		}
-		if ss.Namespace != kb.Namespace {
-			t.Fatalf("StatefulSet namespace: expected %q, got %q", kb.Namespace, ss.Namespace)
+		if ss.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("StatefulSet namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), ss.Namespace)
 		}
 
 		// Container image
@@ -1759,8 +1759,8 @@ func TestProperty_AppConfigMapBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Namespace matches KB
-		if cm.Namespace != kb.Namespace {
-			t.Fatalf("ConfigMap namespace: expected %q, got %q", kb.Namespace, cm.Namespace)
+		if cm.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("ConfigMap namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), cm.Namespace)
 		}
 
 		// 3. Has all 8 data keys with correct values
@@ -1826,8 +1826,8 @@ func TestProperty_ExternalSecretBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Namespace matches KB
-		if obj.GetNamespace() != kb.Namespace {
-			t.Fatalf("ExternalSecret namespace: expected %q, got %q", kb.Namespace, obj.GetNamespace())
+		if obj.GetNamespace() != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("ExternalSecret namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), obj.GetNamespace())
 		}
 
 		// 3. GVK is external-secrets.io/v1/ExternalSecret
@@ -1939,8 +1939,8 @@ func TestProperty_EmbeddingBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Deployment namespace matches KB namespace
-		if deploy.Namespace != kb.Namespace {
-			t.Fatalf("Deployment namespace: expected %q, got %q", kb.Namespace, deploy.Namespace)
+		if deploy.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("Deployment namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), deploy.Namespace)
 		}
 
 		// 3. Container image is EmbeddingImage
@@ -2085,8 +2085,8 @@ func TestProperty_QueryBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Deployment namespace matches KB namespace
-		if deploy.Namespace != kb.Namespace {
-			t.Fatalf("Deployment namespace: expected %q, got %q", kb.Namespace, deploy.Namespace)
+		if deploy.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("Deployment namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), deploy.Namespace)
 		}
 
 		// 3. Container image is QueryImage
@@ -2243,8 +2243,8 @@ func TestProperty_HTTPRouteBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Namespace matches KB namespace
-		if obj.GetNamespace() != kb.Namespace {
-			t.Fatalf("HTTPRoute namespace: expected %q, got %q", kb.Namespace, obj.GetNamespace())
+		if obj.GetNamespace() != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("HTTPRoute namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), obj.GetNamespace())
 		}
 
 		// 3. GVK is gateway.networking.k8s.io/v1/HTTPRoute
@@ -2392,8 +2392,8 @@ func TestProperty_GraphBuilderCorrectness(t *testing.T) {
 		}
 
 		// 2. Deployment namespace matches KB namespace (Req 2.1)
-		if deploy.Namespace != kb.Namespace {
-			t.Fatalf("Deployment namespace: expected %q, got %q", kb.Namespace, deploy.Namespace)
+		if deploy.Namespace != fmt.Sprintf("kb-%s", kb.Name) {
+			t.Fatalf("Deployment namespace: expected %q, got %q", fmt.Sprintf("kb-%s", kb.Name), deploy.Namespace)
 		}
 
 		// 3. Container image is GraphImage (Req 2.2)

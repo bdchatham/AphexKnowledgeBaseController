@@ -55,6 +55,14 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - namespaces
+    verbs:
+      - get
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
       - services
       - configmaps
     verbs:
