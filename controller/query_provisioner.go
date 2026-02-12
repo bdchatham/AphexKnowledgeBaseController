@@ -148,7 +148,7 @@ func buildQueryService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 func (r *KnowledgeBaseReconciler) reconcileQuery(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := buildQueryDeployment(kb)
 	svc := buildQueryService(kb)
-	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "query")
+	return r.reconcileWorkloadAndService(ctx, deploy, svc, "query")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupQuery(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

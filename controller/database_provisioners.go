@@ -170,7 +170,7 @@ func buildQdrantService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 func (r *KnowledgeBaseReconciler) reconcileQdrant(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := buildQdrantStatefulSet(kb)
 	svc := buildQdrantService(kb)
-	return r.reconcileWorkloadAndService(ctx, kb, ss, svc, "qdrant")
+	return r.reconcileWorkloadAndService(ctx, ss, svc, "qdrant")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupQdrant(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
@@ -334,7 +334,7 @@ func buildPostgresService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 func (r *KnowledgeBaseReconciler) reconcilePostgres(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	ss := buildPostgresStatefulSet(kb)
 	svc := buildPostgresService(kb)
-	return r.reconcileWorkloadAndService(ctx, kb, ss, svc, "postgres")
+	return r.reconcileWorkloadAndService(ctx, ss, svc, "postgres")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupPostgres(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

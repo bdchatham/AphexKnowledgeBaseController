@@ -600,7 +600,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepositoryConfig(ctx context.Context,
 		Data: repoData,
 	}
 
-	return r.reconcileConfigMap(ctx, kb, configMap, "repository-config")
+	return r.reconcileConfigMap(ctx, configMap, "repository-config")
 }
 
 func (r *KnowledgeBaseReconciler) buildRepositoryConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {
@@ -676,7 +676,7 @@ func (r *KnowledgeBaseReconciler) reconcileSourceConfig(ctx context.Context, kb 
 		Data: sourceData,
 	}
 
-	return r.reconcileConfigMap(ctx, kb, configMap, "source-config")
+	return r.reconcileConfigMap(ctx, configMap, "source-config")
 }
 
 func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.KnowledgeBase) map[string]string {

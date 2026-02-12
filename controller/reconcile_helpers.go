@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	corev1 "k8s.io/api/core/v1"
-
-	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 )
 
 // reconcileWorkloadAndService handles the common pattern of reconciling a workload
@@ -18,7 +15,6 @@ import (
 // across provisioners that all follow the same get-or-create-or-update pattern.
 func (r *KnowledgeBaseReconciler) reconcileWorkloadAndService(
 	ctx context.Context,
-	kb *platformv1alpha1.KnowledgeBase,
 	workload client.Object,
 	svc *corev1.Service,
 	componentName string,
@@ -75,7 +71,6 @@ func (r *KnowledgeBaseReconciler) upsertService(ctx context.Context, desired *co
 // (ExternalSecret, HTTPRoute) that follow the same get-or-create-or-update pattern.
 func (r *KnowledgeBaseReconciler) reconcileUnstructured(
 	ctx context.Context,
-	kb *platformv1alpha1.KnowledgeBase,
 	desired client.Object,
 	componentName string,
 ) error {
@@ -120,7 +115,6 @@ func (r *KnowledgeBaseReconciler) deleteIfExists(ctx context.Context, obj client
 // owner reference, get-or-create-or-update semantics.
 func (r *KnowledgeBaseReconciler) reconcileConfigMap(
 	ctx context.Context,
-	kb *platformv1alpha1.KnowledgeBase,
 	configMap *corev1.ConfigMap,
 	componentName string,
 ) error {

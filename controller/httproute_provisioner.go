@@ -71,7 +71,7 @@ func buildHTTPRoute(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstructur
 
 func (r *KnowledgeBaseReconciler) reconcileHTTPRoute(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	desired := buildHTTPRoute(kb)
-	return r.reconcileUnstructured(ctx, kb, desired, "httproute")
+	return r.reconcileUnstructured(ctx, desired, "httproute")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupHTTPRoute(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

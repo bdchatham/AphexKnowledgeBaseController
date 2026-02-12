@@ -77,7 +77,7 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 
 func (r *KnowledgeBaseReconciler) reconcileExternalSecret(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	desired := buildExternalSecret(kb)
-	return r.reconcileUnstructured(ctx, kb, desired, "external-secret")
+	return r.reconcileUnstructured(ctx, desired, "external-secret")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupExternalSecret(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

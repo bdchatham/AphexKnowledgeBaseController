@@ -135,7 +135,7 @@ func buildEmbeddingService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 func (r *KnowledgeBaseReconciler) reconcileEmbedding(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := buildEmbeddingDeployment(kb)
 	svc := buildEmbeddingService(kb)
-	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "embedding")
+	return r.reconcileWorkloadAndService(ctx, deploy, svc, "embedding")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupEmbedding(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

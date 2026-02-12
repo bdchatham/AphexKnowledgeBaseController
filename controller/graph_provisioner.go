@@ -170,7 +170,7 @@ func buildGraphService(kb *platformv1alpha1.KnowledgeBase) *corev1.Service {
 func (r *KnowledgeBaseReconciler) reconcileGraph(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
 	deploy := buildGraphDeployment(kb)
 	svc := buildGraphService(kb)
-	return r.reconcileWorkloadAndService(ctx, kb, deploy, svc, "graph")
+	return r.reconcileWorkloadAndService(ctx, deploy, svc, "graph")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupGraph(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
