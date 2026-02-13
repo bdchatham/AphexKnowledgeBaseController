@@ -47,6 +47,40 @@ CREATE TABLE IF NOT EXISTS document_state (
     content_hash VARCHAR(64)
 );
 CREATE INDEX IF NOT EXISTS idx_last_checked ON document_state(last_checked);
+
+CREATE TABLE IF NOT EXISTS code_graph_nodes (
+    arn TEXT PRIMARY KEY,
+    type TEXT NOT NULL CHECK (type IN ('code', 'doc', 'k8s', 'infra')),
+    workspace TEXT NOT NULL,
+    package TEXT NOT NULL,
+    path TEXT NOT NULL,
+    symbol TEXT,
+    kind TEXT CHECK (kind IN ('function', 'class', 'method', 'variable', 'type', 'module', 'file', 'package')),
+    name TEXT NOT NULL,
+    signature TEXT,
+    documentation TEXT,
+    file_path TEXT,
+    line_number INTEGER,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    index_hash TEXT
+);
+
+CREATE TABLE IF NOT EXISTS code_graph_edges (
+    id SERIAL PRIMARY KEY,
+    from_arn TEXT NOT NULL REFERENCES code_graph_nodes(arn) ON DELETE CASCADE,
+    to_arn TEXT NOT NULL REFERENCES code_graph_nodes(arn) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('contains', 'references', 'implements', 'extends', 'imports', 'documents')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (from_arn, to_arn, type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nodes_package ON code_graph_nodes(package);
+CREATE INDEX IF NOT EXISTS idx_nodes_kind ON code_graph_nodes(kind);
+CREATE INDEX IF NOT EXISTS idx_nodes_path ON code_graph_nodes(path);
+CREATE INDEX IF NOT EXISTS idx_edges_from ON code_graph_edges(from_arn);
+CREATE INDEX IF NOT EXISTS idx_edges_to ON code_graph_edges(to_arn);
+CREATE INDEX IF NOT EXISTS idx_edges_type ON code_graph_edges(type);
 "
 echo "PostgreSQL schema created successfully."`
 
