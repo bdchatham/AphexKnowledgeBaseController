@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	repoMappingNamespace     = "archon"
-	repoMappingConfigMapName = "archon-repo-mapping"
+	repoMappingConfigMapName = "repo-mapping"
 
 	sourceTypeDocs    = "docs"
 	sourceTypeCode    = "code"

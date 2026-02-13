@@ -849,11 +849,8 @@ func TestRemoveEntriesForKnowledgeBase_RemovesAllWhenAllMatch(t *testing.T) {
 }
 
 func TestRepoMappingConstants(t *testing.T) {
-	if repoMappingNamespace != "archon" {
-		t.Fatalf("expected repoMappingNamespace='archon', got %q", repoMappingNamespace)
-	}
-	if repoMappingConfigMapName != "archon-repo-mapping" {
-		t.Fatalf("expected repoMappingConfigMapName='archon-repo-mapping', got %q", repoMappingConfigMapName)
+	if repoMappingConfigMapName != "repo-mapping" {
+		t.Fatalf("expected repoMappingConfigMapName='repo-mapping', got %q", repoMappingConfigMapName)
 	}
 }
 

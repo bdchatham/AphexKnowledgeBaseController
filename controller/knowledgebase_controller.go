@@ -993,7 +993,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 	mappingValue := fmt.Sprintf("%s/%s", kb.Name, infraNamespace(kb))
 
 	configMap := &corev1.ConfigMap{}
-	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
+	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: orgNamespace(kb)}, configMap)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get repo mapping ConfigMap: %w", err)
@@ -1001,11 +1001,11 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 		configMap = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      repoMappingConfigMapName,
-				Namespace: repoMappingNamespace,
+				Namespace: orgNamespace(kb),
 				Labels: map[string]string{
 					constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
-					"app.kubernetes.io/name":      "archon-repo-mapping",
-					"app.kubernetes.io/part-of":   "archon",
+					constants.LabelAphexOrg:       kb.Spec.Organization,
+					"app.kubernetes.io/name":      "repo-mapping",
 					"app.kubernetes.io/component": "event-routing",
 				},
 			},
@@ -1027,14 +1027,14 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 		if createErr := r.Create(ctx, configMap); createErr != nil {
 			return fmt.Errorf("failed to create repo mapping ConfigMap: %w", createErr)
 		}
-		logger.Info("Created repo mapping ConfigMap", "namespace", repoMappingNamespace)
+		logger.Info("Created repo mapping ConfigMap", "namespace", orgNamespace(kb))
 		return nil
 	}
 
 	if updateErr := r.Update(ctx, configMap); updateErr != nil {
 		return fmt.Errorf("failed to update repo mapping ConfigMap: %w", updateErr)
 	}
-	logger.V(1).Info("Updated repo mapping ConfigMap", "namespace", repoMappingNamespace, "knowledgebase", kb.Name)
+	logger.V(1).Info("Updated repo mapping ConfigMap", "namespace", orgNamespace(kb), "knowledgebase", kb.Name)
 	return nil
 }
 
@@ -1042,7 +1042,7 @@ func (r *KnowledgeBaseReconciler) cleanupRepoMapping(ctx context.Context, kb *pl
 	mappingValue := fmt.Sprintf("%s/%s", kb.Name, infraNamespace(kb))
 
 	configMap := &corev1.ConfigMap{}
-	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: repoMappingNamespace}, configMap)
+	err := r.Get(ctx, client.ObjectKey{Name: repoMappingConfigMapName, Namespace: orgNamespace(kb)}, configMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
