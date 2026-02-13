@@ -8,6 +8,7 @@ import (
 
 	platformv1alpha1 "github.com/bdchatham/AphexControllerRuntime/api/v1alpha1"
 	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -211,4 +212,59 @@ func httpRouteName(kb *platformv1alpha1.KnowledgeBase) string {
 
 func secretStoreName(kb *platformv1alpha1.KnowledgeBase) string {
 	return fmt.Sprintf("org-%s-store", kb.Spec.Organization)
+}
+
+func (r *KnowledgeBaseReconciler) createInitialSyncTaskRun(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
+	logger := log.FromContext(ctx)
+	ns := infraNamespace(kb)
+
+	taskRun := &tektonv1.TaskRun{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("%s-initial-sync-", kb.Name),
+			Namespace:    ns,
+			Labels: map[string]string{
+				"knowledgebase":          kb.Name,
+				constants.LabelManagedBy: constants.ManagedByKnowledgeBaseController,
+			},
+		},
+		Spec: tektonv1.TaskRunSpec{
+			TaskRef: &tektonv1.TaskRef{
+				ResolverRef: tektonv1.ResolverRef{
+					Resolver: "cluster",
+					Params: []tektonv1.Param{
+						{Name: "kind", Value: *tektonv1.NewStructuredValues("task")},
+						{Name: "name", Value: *tektonv1.NewStructuredValues("scip-sync")},
+						{Name: "namespace", Value: *tektonv1.NewStructuredValues("tekton-pipelines")},
+					},
+				},
+			},
+			Params: []tektonv1.Param{
+				{Name: "kb-name", Value: *tektonv1.NewStructuredValues(kb.Name)},
+				{Name: "kb-namespace", Value: *tektonv1.NewStructuredValues(ns)},
+				{Name: "workspace-name", Value: *tektonv1.NewStructuredValues(kb.Name)},
+			},
+			Workspaces: []tektonv1.WorkspaceBinding{
+				{
+					Name: "shared-data",
+					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: mustParseQuantity("5Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := r.Create(ctx, taskRun); err != nil {
+		return fmt.Errorf("failed to create initial sync TaskRun: %w", err)
+	}
+
+	logger.Info("Created initial sync TaskRun", "taskrun", taskRun.Name, "namespace", ns)
+	return nil
 }

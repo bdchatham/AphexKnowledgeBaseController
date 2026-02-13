@@ -427,6 +427,12 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	if kb.Status.LastSyncTime == nil {
+		if err := r.createInitialSyncTaskRun(ctx, kb); err != nil {
+			logger.Error(err, "Failed to create initial sync TaskRun")
+		}
+	}
+
 	timer.ObserveSuccess()
 	metrics.GetHealthState().RecordSuccess(constants.ControllerNameKnowledgeBase)
 	logger.Info("KnowledgeBase reconciled successfully",
