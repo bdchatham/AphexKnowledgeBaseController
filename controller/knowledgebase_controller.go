@@ -1020,7 +1020,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 	removeEntriesForKnowledgeBase(configMap.Data, mappingValue)
 
 	for _, source := range kb.Spec.Sources {
-		configMap.Data[source.URL] = mappingValue
+		configMap.Data[repoMappingKey(source.URL)] = mappingValue
 	}
 
 	if err != nil {
@@ -1068,6 +1068,17 @@ func removeEntriesForKnowledgeBase(data map[string]string, mappingValue string) 
 			delete(data, key)
 		}
 	}
+}
+
+func repoMappingKey(repoURL string) string {
+	trimmed := strings.TrimPrefix(repoURL, "https://")
+	trimmed = strings.TrimPrefix(trimmed, "http://")
+	trimmed = strings.TrimSuffix(trimmed, ".git")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) >= 3 {
+		return parts[len(parts)-2] + "_" + parts[len(parts)-1]
+	}
+	return strings.ReplaceAll(trimmed, "/", "_")
 }
 
 func (r *KnowledgeBaseReconciler) cleanupMCPServer(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {
