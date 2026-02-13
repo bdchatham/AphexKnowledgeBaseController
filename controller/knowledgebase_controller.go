@@ -1004,7 +1004,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 				Namespace: orgNamespace(kb),
 				Labels: map[string]string{
 					constants.LabelManagedBy:      constants.ManagedByKnowledgeBaseController,
-					constants.LabelAphexOrg:       kb.Spec.Organization,
+					constants.LabelOrganization:   kb.Spec.Organization,
 					"app.kubernetes.io/name":      "repo-mapping",
 					"app.kubernetes.io/component": "event-routing",
 				},
