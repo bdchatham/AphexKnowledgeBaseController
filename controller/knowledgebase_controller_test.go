@@ -26,7 +26,7 @@ func TestValidateSpec_EmptyOrganization(t *testing.T) {
 			Name:         "test-kb",
 			Organization: "",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "repo", SourceType: "docs"},
 			},
 		},
 	}
@@ -66,35 +66,38 @@ func TestValidateSpec_EmptyURL(t *testing.T) {
 			Name:         "test-kb",
 			Organization: "test-org",
 			Sources: []platformv1alpha1.Source{
-				{URL: "", SourceType: "docs"},
+				{RepoOrg: "", RepoName: "", SourceType: "docs"},
 			},
 		},
 	}
 
 	err := r.validateSpec(kb)
 	if err == nil {
-		t.Fatal("expected error for empty URL, got nil")
+		t.Fatal("expected error for empty repoOrg, got nil")
 	}
-	if err.Error() != "source[0]: URL cannot be empty" {
+	if err.Error() != "source[0]: repoOrg cannot be empty" {
 		t.Fatalf("unexpected error message: %s", err.Error())
 	}
 }
 
-func TestValidateSpec_InvalidURLScheme(t *testing.T) {
+func TestValidateSpec_EmptyRepoName(t *testing.T) {
 	r := &KnowledgeBaseReconciler{}
 	kb := &platformv1alpha1.KnowledgeBase{
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name:         "test-kb",
 			Organization: "test-org",
 			Sources: []platformv1alpha1.Source{
-				{URL: "ftp://example.com/repo", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "", SourceType: "docs"},
 			},
 		},
 	}
 
 	err := r.validateSpec(kb)
 	if err == nil {
-		t.Fatal("expected error for invalid URL scheme, got nil")
+		t.Fatal("expected error for empty repoName, got nil")
+	}
+	if err.Error() != "source[0]: repoName cannot be empty" {
+		t.Fatalf("unexpected error message: %s", err.Error())
 	}
 }
 
@@ -105,7 +108,7 @@ func TestValidateSpec_InvalidBranch(t *testing.T) {
 			Name:         "test-kb",
 			Organization: "test-org",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", Branch: "bad branch name"},
+				{RepoOrg: "org", RepoName: "repo", Branch: "bad branch name"},
 			},
 		},
 	}
@@ -123,9 +126,9 @@ func TestValidateSpec_ValidSources(t *testing.T) {
 			Name:         "test-kb",
 			Organization: "test-org",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "docs", Branch: "main"},
-				{URL: "https://github.com/org/repo-b", SourceType: "code"},
-				{URL: "https://github.com/org/repo-c"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs", Branch: "main"},
+				{RepoOrg: "org", RepoName: "repo-b", SourceType: "code"},
+				{RepoOrg: "org", RepoName: "repo-c"},
 			},
 		},
 	}
@@ -143,7 +146,7 @@ func TestValidateSpec_OmittedSourceTypeDefaultsToDocs(t *testing.T) {
 			Name:         "test-kb",
 			Organization: "test-org",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo"},
+				{RepoOrg: "org", RepoName: "repo"},
 			},
 		},
 	}
@@ -161,7 +164,7 @@ func TestBuildRepositoryConfigData_UsesNameField(t *testing.T) {
 			Name:        "My Knowledge Base",
 			Description: "A test KB",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "docs", Branch: "main"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs", Branch: "main"},
 			},
 		},
 	}
@@ -182,9 +185,9 @@ func TestBuildRepositoryConfigData_IncludesSourceType(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "code", Branch: "main"},
-				{URL: "https://github.com/org/repo-b", SourceType: "docs"},
-				{URL: "https://github.com/org/repo-c"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "code", Branch: "main"},
+				{RepoOrg: "org", RepoName: "repo-b", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "repo-c"},
 			},
 		},
 	}
@@ -215,7 +218,7 @@ func TestBuildRepositoryConfigData_DefaultBranch(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo"},
+				{RepoOrg: "org", RepoName: "repo"},
 			},
 		},
 	}
@@ -233,7 +236,7 @@ func TestBuildRepositoryConfigData_DefaultPaths(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo"},
+				{RepoOrg: "org", RepoName: "repo"},
 			},
 		},
 	}
@@ -251,7 +254,7 @@ func TestBuildRepositoryConfigData_CustomPaths(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", Paths: []string{"src/**", "lib/**"}},
+				{RepoOrg: "org", RepoName: "repo", Paths: []string{"src/**", "lib/**"}},
 			},
 		},
 	}
@@ -286,8 +289,8 @@ func TestDefaultSourceType_ExplicitCodePassthrough(t *testing.T) {
 
 func TestHasCodeSources_ReturnsTrueWhenCodeSourcePresent(t *testing.T) {
 	sources := []platformv1alpha1.Source{
-		{URL: "https://github.com/org/repo-a", SourceType: "docs"},
-		{URL: "https://github.com/org/repo-b", SourceType: "code"},
+		{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs"},
+		{RepoOrg: "org", RepoName: "repo-b", SourceType: "code"},
 	}
 
 	if !hasCodeSources(sources) {
@@ -297,8 +300,8 @@ func TestHasCodeSources_ReturnsTrueWhenCodeSourcePresent(t *testing.T) {
 
 func TestHasCodeSources_ReturnsFalseWhenAllDocsSources(t *testing.T) {
 	sources := []platformv1alpha1.Source{
-		{URL: "https://github.com/org/repo-a", SourceType: "docs"},
-		{URL: "https://github.com/org/repo-b", SourceType: "docs"},
+		{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs"},
+		{RepoOrg: "org", RepoName: "repo-b", SourceType: "docs"},
 	}
 
 	if hasCodeSources(sources) {
@@ -308,8 +311,8 @@ func TestHasCodeSources_ReturnsFalseWhenAllDocsSources(t *testing.T) {
 
 func TestHasCodeSources_ReturnsFalseWhenOmittedSourceType(t *testing.T) {
 	sources := []platformv1alpha1.Source{
-		{URL: "https://github.com/org/repo-a"},
-		{URL: "https://github.com/org/repo-b"},
+		{RepoOrg: "org", RepoName: "repo-a"},
+		{RepoOrg: "org", RepoName: "repo-b"},
 	}
 
 	if hasCodeSources(sources) {
@@ -329,16 +332,16 @@ func TestBuildSourceConfigData_PerSourceEntries(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "code", Paths: []string{"src/**"}},
-				{URL: "https://github.com/org/repo-b", SourceType: "docs", Paths: []string{".kiro/docs"}},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "code", Paths: []string{"src/**"}},
+				{RepoOrg: "org", RepoName: "repo-b", SourceType: "docs", Paths: []string{".kiro/docs"}},
 			},
 		},
 	}
 
 	data := r.buildSourceConfigData(kb)
 
-	if data["source.0.url"] != "https://github.com/org/repo-a" {
-		t.Fatalf("expected source.0.url='https://github.com/org/repo-a', got %q", data["source.0.url"])
+	if data["source.0.repoOrg"] != "org" {
+		t.Fatalf("expected source.0.repoOrg='org', got %q", data["source.0.repoOrg"])
 	}
 	if data["source.0.sourceType"] != "code" {
 		t.Fatalf("expected source.0.sourceType='code', got %q", data["source.0.sourceType"])
@@ -346,8 +349,8 @@ func TestBuildSourceConfigData_PerSourceEntries(t *testing.T) {
 	if data["source.0.paths"] != "src/**" {
 		t.Fatalf("expected source.0.paths='src/**', got %q", data["source.0.paths"])
 	}
-	if data["source.1.url"] != "https://github.com/org/repo-b" {
-		t.Fatalf("expected source.1.url='https://github.com/org/repo-b', got %q", data["source.1.url"])
+	if data["source.1.repoOrg"] != "org" {
+		t.Fatalf("expected source.1.repoOrg='org', got %q", data["source.1.repoOrg"])
 	}
 	if data["source.1.sourceType"] != "docs" {
 		t.Fatalf("expected source.1.sourceType='docs', got %q", data["source.1.sourceType"])
@@ -367,7 +370,7 @@ func TestBuildSourceConfigData_IncludesCodeGraphEndpointWhenCodeSourcePresent(t 
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "code"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "code"},
 			},
 		},
 	}
@@ -390,7 +393,7 @@ func TestBuildSourceConfigData_OmitsCodeGraphEndpointWhenNoCodeSources(t *testin
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs"},
 			},
 		},
 	}
@@ -408,7 +411,7 @@ func TestBuildSourceConfigData_DefaultsOmittedSourceTypeToDocs(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a"},
+				{RepoOrg: "org", RepoName: "repo-a"},
 			},
 		},
 	}
@@ -426,7 +429,7 @@ func TestBuildSourceConfigData_OmitsPathsWhenEmpty(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "docs"},
 			},
 		},
 	}
@@ -444,7 +447,7 @@ func TestBuildSourceConfigData_MultiplePaths(t *testing.T) {
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Name: "test-kb",
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo-a", SourceType: "code", Paths: []string{"src/**", "lib/**", "cmd/**"}},
+				{RepoOrg: "org", RepoName: "repo-a", SourceType: "code", Paths: []string{"src/**", "lib/**", "cmd/**"}},
 			},
 		},
 	}
@@ -468,11 +471,11 @@ func sourceGenerator() *rapid.Generator[platformv1alpha1.Source] {
 			paths[i] = rapid.StringMatching(`[a-z][a-z0-9/_.*]{1,20}`).Draw(t, fmt.Sprintf("path_%d", i))
 		}
 
-		url := fmt.Sprintf("https://github.com/org/%s",
-			rapid.StringMatching(`[a-z][a-z0-9-]{2,15}`).Draw(t, "repoName"))
+		repoName := rapid.StringMatching(`[a-z][a-z0-9-]{2,15}`).Draw(t, "repoName")
 
 		return platformv1alpha1.Source{
-			URL:        url,
+			RepoOrg:    "org",
+			RepoName:   repoName,
 			SourceType: sourceType,
 			Paths:      paths,
 		}
@@ -559,12 +562,20 @@ func TestProperty_ConfigMapReconciliationProducesCorrectSourceConfig(t *testing.
 		for i, source := range kb.Spec.Sources {
 			prefix := fmt.Sprintf("source.%d.", i)
 
-			url, urlExists := data[prefix+"url"]
-			if !urlExists {
-				t.Fatalf("missing %surl for source %d", prefix, i)
+			repoOrg, orgExists := data[prefix+"repoOrg"]
+			if !orgExists {
+				t.Fatalf("missing %srepoOrg for source %d", prefix, i)
 			}
-			if url != source.URL {
-				t.Fatalf("source %d url mismatch: expected %q, got %q", i, source.URL, url)
+			if repoOrg != source.RepoOrg {
+				t.Fatalf("source %d repoOrg mismatch: expected %q, got %q", i, source.RepoOrg, repoOrg)
+			}
+
+			repoName, nameExists := data[prefix+"repoName"]
+			if !nameExists {
+				t.Fatalf("missing %srepoName for source %d", prefix, i)
+			}
+			if repoName != source.RepoName {
+				t.Fatalf("source %d repoName mismatch: expected %q, got %q", i, source.RepoName, repoName)
 			}
 
 			sourceType, typeExists := data[prefix+"sourceType"]
@@ -681,7 +692,7 @@ func TestCheckCodeGraphHealth_Success(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "archon"},
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", SourceType: "code"},
+				{RepoOrg: "org", RepoName: "repo", SourceType: "code"},
 			},
 		},
 	}
@@ -701,7 +712,7 @@ func TestCheckCodeGraphHealth_Non2xx(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "archon"},
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", SourceType: "code"},
+				{RepoOrg: "org", RepoName: "repo", SourceType: "code"},
 			},
 		},
 	}
@@ -721,7 +732,7 @@ func TestCheckCodeGraphHealth_ConnectionError(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "archon"},
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", SourceType: "code"},
+				{RepoOrg: "org", RepoName: "repo", SourceType: "code"},
 			},
 		},
 	}
@@ -741,7 +752,7 @@ func TestCheckCodeGraphHealth_NoCodeSources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "archon"},
 		Spec: platformv1alpha1.KnowledgeBaseSpec{
 			Sources: []platformv1alpha1.Source{
-				{URL: "https://github.com/org/repo", SourceType: "docs"},
+				{RepoOrg: "org", RepoName: "repo", SourceType: "docs"},
 			},
 		},
 	}
@@ -889,16 +900,16 @@ func TestProperty_RepoMappingProducesCorrectEntries(t *testing.T) {
 
 		data := make(map[string]string)
 		for _, source := range kb.Spec.Sources {
-			data[source.URL] = mappingValue
+			data[source.FullName()] = mappingValue
 		}
 
 		for _, source := range kb.Spec.Sources {
-			val, exists := data[source.URL]
+			val, exists := data[source.FullName()]
 			if !exists {
-				t.Fatalf("missing mapping for source URL %q", source.URL)
+				t.Fatalf("missing mapping for source FullName %q", source.FullName())
 			}
 			if val != mappingValue {
-				t.Fatalf("mapping value mismatch for %q: expected %q, got %q", source.URL, mappingValue, val)
+				t.Fatalf("mapping value mismatch for %q: expected %q, got %q", source.FullName(), mappingValue, val)
 			}
 		}
 
@@ -943,11 +954,11 @@ func TestProperty_TriggerProvisioningProducesCorrectResources(t *testing.T) {
 			t.Fatalf("Trigger namespace: expected %q, got %q", expectedNamespace, trigger.Namespace)
 		}
 
-		// (b) Trigger CEL filter contains all source URLs
+		// (b) Trigger CEL filter contains all source FullNames
 		celFilter := buildCELFilter(kb.Spec.Sources)
 		for _, source := range kb.Spec.Sources {
-			if !strings.Contains(celFilter, source.URL) {
-				t.Fatalf("CEL filter %q does not contain source URL %q", celFilter, source.URL)
+			if !strings.Contains(celFilter, source.FullName()) {
+				t.Fatalf("CEL filter %q does not contain source FullName %q", celFilter, source.FullName())
 			}
 		}
 
@@ -1071,7 +1082,8 @@ func TestProperty_CELFilterReflectsCurrentSources(t *testing.T) {
 					}
 				}
 				sources[i] = platformv1alpha1.Source{
-					URL: fmt.Sprintf("https://github.com/org/%s", repoName),
+					RepoOrg:  "org",
+					RepoName: repoName,
 				}
 			}
 			return sources
@@ -1082,27 +1094,27 @@ func TestProperty_CELFilterReflectsCurrentSources(t *testing.T) {
 
 		oldFilter := buildCELFilter(oldSources)
 		for _, source := range oldSources {
-			if !strings.Contains(oldFilter, source.URL) {
-				t.Fatalf("old CEL filter %q does not contain source URL %q", oldFilter, source.URL)
+			if !strings.Contains(oldFilter, source.FullName()) {
+				t.Fatalf("old CEL filter %q does not contain source FullName %q", oldFilter, source.FullName())
 			}
 		}
 
 		newFilter := buildCELFilter(newSources)
 		for _, source := range newSources {
-			if !strings.Contains(newFilter, source.URL) {
-				t.Fatalf("new CEL filter %q does not contain source URL %q", newFilter, source.URL)
+			if !strings.Contains(newFilter, source.FullName()) {
+				t.Fatalf("new CEL filter %q does not contain source FullName %q", newFilter, source.FullName())
 			}
 		}
 
-		removedURLs := make(map[string]bool)
+		removedNames := make(map[string]bool)
 		for _, source := range oldSources {
-			removedURLs[source.URL] = true
+			removedNames[source.FullName()] = true
 		}
 		for _, source := range newSources {
-			delete(removedURLs, source.URL)
+			delete(removedNames, source.FullName())
 		}
 
-		for removedURL := range removedURLs {
+		for removedURL := range removedNames {
 			quotedURL := fmt.Sprintf("'%s'", removedURL)
 			if strings.Contains(newFilter, quotedURL) {
 				t.Fatalf("new CEL filter %q still contains removed URL %q", newFilter, removedURL)

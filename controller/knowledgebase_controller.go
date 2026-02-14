@@ -470,12 +470,12 @@ func (r *KnowledgeBaseReconciler) validateSpec(kb *platformv1alpha1.KnowledgeBas
 	}
 
 	for i, source := range kb.Spec.Sources {
-		if source.URL == "" {
-			return fmt.Errorf("source[%d]: URL cannot be empty", i)
+		if source.RepoOrg == "" {
+			return fmt.Errorf("source[%d]: repoOrg cannot be empty", i)
 		}
 
-		if !strings.HasPrefix(source.URL, "http://") && !strings.HasPrefix(source.URL, "https://") {
-			return fmt.Errorf("source[%d]: URL must start with http:// or https://", i)
+		if source.RepoName == "" {
+			return fmt.Errorf("source[%d]: repoName cannot be empty", i)
 		}
 
 		if source.Branch != "" && !isValidBranchName(source.Branch) {
@@ -621,7 +621,8 @@ func (r *KnowledgeBaseReconciler) buildRepositoryConfigData(kb *platformv1alpha1
 
 	for i, source := range kb.Spec.Sources {
 		prefix := fmt.Sprintf("repo.%d.", i)
-		data[prefix+"url"] = source.URL
+		data[prefix+"repoOrg"] = source.RepoOrg
+		data[prefix+"repoName"] = source.RepoName
 
 		branch := source.Branch
 		if branch == "" {
@@ -690,7 +691,8 @@ func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.Kno
 
 	for i, source := range kb.Spec.Sources {
 		prefix := fmt.Sprintf("source.%d.", i)
-		data[prefix+"url"] = source.URL
+		data[prefix+"repoOrg"] = source.RepoOrg
+		data[prefix+"repoName"] = source.RepoName
 		data[prefix+"sourceType"] = defaultSourceType(source.SourceType)
 
 		if len(source.Paths) > 0 {
@@ -1020,7 +1022,7 @@ func (r *KnowledgeBaseReconciler) reconcileRepoMapping(ctx context.Context, kb *
 	removeEntriesForKnowledgeBase(configMap.Data, mappingValue)
 
 	for _, source := range kb.Spec.Sources {
-		configMap.Data[repoMappingKey(source.URL)] = mappingValue
+		configMap.Data[repoMappingKey(&source)] = mappingValue
 	}
 
 	if err != nil {
@@ -1070,15 +1072,8 @@ func removeEntriesForKnowledgeBase(data map[string]string, mappingValue string) 
 	}
 }
 
-func repoMappingKey(repoURL string) string {
-	trimmed := strings.TrimPrefix(repoURL, "https://")
-	trimmed = strings.TrimPrefix(trimmed, "http://")
-	trimmed = strings.TrimSuffix(trimmed, ".git")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) >= 3 {
-		return parts[len(parts)-2] + "_" + parts[len(parts)-1]
-	}
-	return strings.ReplaceAll(trimmed, "/", "_")
+func repoMappingKey(source *platformv1alpha1.Source) string {
+	return source.RepoOrg + "_" + source.RepoName
 }
 
 func (r *KnowledgeBaseReconciler) cleanupMCPServer(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) error {

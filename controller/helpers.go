@@ -139,18 +139,17 @@ func hasCodeSources(sources []platformv1alpha1.Source) bool {
 }
 
 // buildCELFilter constructs a CEL expression that matches push events
-// for the given source repository URLs. A single source uses equality;
-// multiple sources use the `in` operator with a list literal.
+// for the given source repositories using body.repository.full_name.
 func buildCELFilter(sources []platformv1alpha1.Source) string {
 	if len(sources) == 1 {
-		return fmt.Sprintf("body.repository.clone_url == '%s'", sources[0].URL)
+		return fmt.Sprintf("body.repository.full_name == '%s'", sources[0].FullName())
 	}
 
 	quoted := make([]string, len(sources))
 	for i, source := range sources {
-		quoted[i] = fmt.Sprintf("'%s'", source.URL)
+		quoted[i] = fmt.Sprintf("'%s'", source.FullName())
 	}
-	return fmt.Sprintf("body.repository.clone_url in [%s]", strings.Join(quoted, ", "))
+	return fmt.Sprintf("body.repository.full_name in [%s]", strings.Join(quoted, ", "))
 }
 
 func qdrantStatefulSetName(kb *platformv1alpha1.KnowledgeBase) string {
