@@ -701,7 +701,7 @@ func (r *KnowledgeBaseReconciler) buildSourceConfigData(kb *platformv1alpha1.Kno
 	}
 
 	if hasCodeSources(kb.Spec.Sources) {
-		data["codeGraph.endpoint"] = fmt.Sprintf("http://code-graph.%s:5432", infraNamespace(kb))
+		data["codeGraph.endpoint"] = fmt.Sprintf("http://%s.%s:%d", graphServiceName(kb), infraNamespace(kb), GraphPort)
 	}
 
 	return data
@@ -937,7 +937,7 @@ func (r *KnowledgeBaseReconciler) httpClient() HTTPClient {
 func (r *KnowledgeBaseReconciler) checkVectorStoreHealth(ctx context.Context, kb *platformv1alpha1.KnowledgeBase) {
 	logger := log.FromContext(ctx)
 
-	endpoint := fmt.Sprintf("http://qdrant.%s:6333/health", infraNamespace(kb))
+	endpoint := fmt.Sprintf("http://%s.%s:%d/healthz", qdrantServiceName(kb), infraNamespace(kb), QdrantHTTPPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create vector store health request", "error", err)
@@ -967,7 +967,7 @@ func (r *KnowledgeBaseReconciler) checkCodeGraphHealth(ctx context.Context, kb *
 
 	logger := log.FromContext(ctx)
 
-	endpoint := fmt.Sprintf("http://code-graph.%s:5432/health", infraNamespace(kb))
+	endpoint := fmt.Sprintf("http://%s.%s:%d/health", graphServiceName(kb), infraNamespace(kb), GraphPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.V(1).Info("Failed to create code graph health request", "error", err)

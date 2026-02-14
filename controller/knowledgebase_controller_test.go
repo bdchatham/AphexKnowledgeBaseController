@@ -377,7 +377,7 @@ func TestBuildSourceConfigData_IncludesCodeGraphEndpointWhenCodeSourcePresent(t 
 
 	data := r.buildSourceConfigData(kb)
 
-	expected := "http://code-graph.kb-test-kb:5432"
+	expected := "http://test-kb-graph.kb-test-kb:8081"
 	if data["codeGraph.endpoint"] != expected {
 		t.Fatalf("expected codeGraph.endpoint=%q, got %q", expected, data["codeGraph.endpoint"])
 	}
