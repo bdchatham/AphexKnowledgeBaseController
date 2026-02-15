@@ -46,5 +46,5 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string, kb *platformv
       {"name": "repo-url", "value": "$(tt.params.git-url)"}
     ]
   }
-}`, namespace, constants.EventTaskResolverServiceAccount, repoMappingConfigMapName, orgNamespace, constants.EventTaskResolverServiceAccount, agentParams))
+}`, namespace, constants.EventTaskResolverServiceAccount, repoMappingConfigMapName, orgNamespace, constants.KnowledgeGeneratorServiceAccount, agentParams))
 }

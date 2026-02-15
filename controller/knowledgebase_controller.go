@@ -52,7 +52,7 @@ type KnowledgeBaseReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;create
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;create;update;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings;roles,verbs=get;create;update;delete
 
 // Reconcile manages KnowledgeBase resources
 func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocyclo
@@ -357,6 +357,21 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "resolve_rbac", "success")
+
+	if err := r.reconcileGeneratorRBAC(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile generator RBAC")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "generator_rbac", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Generator RBAC provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after generator RBAC failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "generator_rbac", "success")
 
 	if err := r.reconcileTriggerTemplate(ctx, kb); err != nil {
 		logger.Error(err, "Failed to reconcile TriggerTemplate")
