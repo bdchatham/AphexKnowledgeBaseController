@@ -9,8 +9,8 @@ import (
 
 func buildResolveAndTriggerTaskRun(namespace, orgNamespace string, kb *platformv1alpha1.KnowledgeBase) []byte {
 	agentParams := ""
-	if kb.Spec.Agent != nil && kb.Spec.Agent.APIKeySecretName != "" {
-		agentParams = fmt.Sprintf(`\n    - name: agent-api-key-secret\n      value: %s`, kb.Spec.Agent.APIKeySecretName)
+	if kb.Spec.Agent != nil && kb.Spec.Agent.CredentialSecretName != "" {
+		agentParams = fmt.Sprintf(`\n    - name: auth-credential-secret\n      value: %s`, kb.Spec.Agent.CredentialSecretName)
 		if kb.Spec.Agent.Model != "" {
 			agentParams += fmt.Sprintf(`\n    - name: agent-model\n      value: %s`, kb.Spec.Agent.Model)
 		}

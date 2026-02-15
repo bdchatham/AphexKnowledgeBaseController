@@ -63,10 +63,10 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 
 	if kb.Spec.Agent != nil {
 		data = append(data, map[string]interface{}{
-			"secretKey": "agent_api_key",
+			"secretKey": "auth_credentials",
 			"remoteRef": map[string]interface{}{
 				"key":      OrgSecretsRemoteKey,
-				"property": kb.Spec.Agent.APIKeySecretName,
+				"property": kb.Spec.Agent.CredentialSecretName,
 			},
 		})
 	}

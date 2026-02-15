@@ -131,7 +131,7 @@ func TestValidateSpec_ValidSources(t *testing.T) {
 				{RepoOrg: "org", RepoName: "repo-c"},
 			},
 			Agent: &platformv1alpha1.AgentConfig{
-				APIKeySecretName: "kiro-credentials",
+				CredentialSecretName: "kiro-credentials",
 			},
 		},
 	}
