@@ -66,7 +66,7 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 			"secretKey": "agent_api_key",
 			"remoteRef": map[string]interface{}{
 				"key":      OrgSecretsRemoteKey,
-				"property": "agent-api-key",
+				"property": kb.Spec.Agent.APIKeySecretName,
 			},
 		})
 	}
