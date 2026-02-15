@@ -52,18 +52,11 @@ func (r *KnowledgeBaseReconciler) reconcileResolveRBAC(ctx context.Context, kb *
 			Kind:     "ClusterRole",
 			Name:     constants.EventTaskResolverRole,
 		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      constants.EventTaskResolverServiceAccount,
-				Namespace: kbNS,
-			},
-			{
-				Kind:      "ServiceAccount",
-				Name:      constants.EventTaskResolverServiceAccount,
-				Namespace: orgNamespace(kb),
-			},
-		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      constants.EventTaskResolverServiceAccount,
+			Namespace: orgNamespace(kb),
+		}},
 	}
 
 	existingRB := &rbacv1.RoleBinding{}
