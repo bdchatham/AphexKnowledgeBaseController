@@ -1,6 +1,10 @@
 package controller
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/bdchatham/AphexControllerRuntime/pkg/constants"
+)
 
 func buildResolveAndTriggerTaskRun(namespace, orgNamespace string) []byte {
 	return []byte(fmt.Sprintf(`{
@@ -15,7 +19,7 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string) []byte {
     }
   },
   "spec": {
-    "serviceAccountName": "pipeline-runner",
+    "serviceAccountName": %q,
     "timeout": "5m",
     "taskSpec": {
       "params": [
@@ -25,7 +29,7 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string) []byte {
         {
           "name": "resolve-and-trigger",
           "image": "bitnami/kubectl:latest",
-          "script": "#!/bin/bash\nset -euo pipefail\n\nREPO_URL=\"$(params.repo-url)\"\necho \"Resolving KnowledgeBase for repo: ${REPO_URL}\"\n\n# Parse repoOrg_repoName from URL\nREPO_KEY=$(echo \"${REPO_URL}\" | sed 's|https://||;s|http://||;s|\\.git$||' | awk -F/ '{print $(NF-1) \"_\" $NF}')\necho \"Lookup key: ${REPO_KEY}\"\n\nMAPPING=$(kubectl get configmap %s \\\n  -n %s \\\n  -o jsonpath=\"{.data['${REPO_KEY}']}\" 2>/dev/null || true)\n\nif [ -z \"${MAPPING}\" ]; then\n  echo \"No KnowledgeBase mapping found for ${REPO_KEY}, skipping\"\n  exit 0\nfi\n\nKB_NAME=$(echo \"${MAPPING}\" | cut -d'/' -f1)\nKB_NAMESPACE=$(echo \"${MAPPING}\" | cut -d'/' -f2)\necho \"Resolved to KnowledgeBase: ${KB_NAME} in ${KB_NAMESPACE}\"\n\nEXISTING=$(kubectl get taskrun \\\n  -n \"${KB_NAMESPACE}\" \\\n  -l \"tekton.dev/pipeline=${KB_NAME}\" \\\n  --field-selector=status.conditions[0].status!=True \\\n  --no-headers 2>/dev/null | wc -l || echo \"0\")\n\nif [ \"${EXISTING}\" -gt 0 ]; then\n  echo \"WARNING: Active sync already running for ${KB_NAME}, dropping event\"\n  exit 0\nfi\n\ncat <<EOF | kubectl create -f -\napiVersion: tekton.dev/v1\nkind: TaskRun\nmetadata:\n  generateName: scip-sync-\n  namespace: ${KB_NAMESPACE}\n  labels:\n    app.kubernetes.io/name: scip-sync\n    app.kubernetes.io/component: sync\n    tekton.dev/pipeline: ${KB_NAME}\nspec:\n  serviceAccountName: pipeline-runner\n  timeout: 1h\n  taskRef:\n    resolver: cluster\n    params:\n      - name: kind\n        value: task\n      - name: name\n        value: scip-sync\n      - name: namespace\n        value: tekton-pipelines\n  params:\n    - name: kb-name\n      value: ${KB_NAME}\n    - name: kb-namespace\n      value: ${KB_NAMESPACE}\n    - name: workspace-name\n      value: ${KB_NAME}\n  workspaces:\n    - name: shared-data\n      emptyDir: {}\nEOF\n\necho \"Created scip-sync TaskRun for ${KB_NAME}\""
+          "script": "#!/bin/bash\nset -euo pipefail\n\nREPO_URL=\"$(params.repo-url)\"\necho \"Resolving KnowledgeBase for repo: ${REPO_URL}\"\n\n# Parse repoOrg_repoName from URL\nREPO_KEY=$(echo \"${REPO_URL}\" | sed 's|https://||;s|http://||;s|\\.git$||' | awk -F/ '{print $(NF-1) \"_\" $NF}')\necho \"Lookup key: ${REPO_KEY}\"\n\nMAPPING=$(kubectl get configmap %s \\\n  -n %s \\\n  -o jsonpath=\"{.data['${REPO_KEY}']}\" 2>/dev/null || true)\n\nif [ -z \"${MAPPING}\" ]; then\n  echo \"No KnowledgeBase mapping found for ${REPO_KEY}, skipping\"\n  exit 0\nfi\n\nKB_NAME=$(echo \"${MAPPING}\" | cut -d'/' -f1)\nKB_NAMESPACE=$(echo \"${MAPPING}\" | cut -d'/' -f2)\necho \"Resolved to KnowledgeBase: ${KB_NAME} in ${KB_NAMESPACE}\"\n\nEXISTING=$(kubectl get taskrun \\\n  -n \"${KB_NAMESPACE}\" \\\n  -l \"tekton.dev/pipeline=${KB_NAME}\" \\\n  --field-selector=status.conditions[0].status!=True \\\n  --no-headers 2>/dev/null | wc -l || echo \"0\")\n\nif [ \"${EXISTING}\" -gt 0 ]; then\n  echo \"WARNING: Active sync already running for ${KB_NAME}, dropping event\"\n  exit 0\nfi\n\ncat <<EOF | kubectl create -f -\napiVersion: tekton.dev/v1\nkind: TaskRun\nmetadata:\n  generateName: scip-sync-\n  namespace: ${KB_NAMESPACE}\n  labels:\n    app.kubernetes.io/name: scip-sync\n    app.kubernetes.io/component: sync\n    tekton.dev/pipeline: ${KB_NAME}\nspec:\n  serviceAccountName: %s\n  timeout: 1h\n  taskRef:\n    resolver: cluster\n    params:\n      - name: kind\n        value: task\n      - name: name\n        value: scip-sync\n      - name: namespace\n        value: tekton-pipelines\n  params:\n    - name: kb-name\n      value: ${KB_NAME}\n    - name: kb-namespace\n      value: ${KB_NAMESPACE}\n    - name: workspace-name\n      value: ${KB_NAME}\n  workspaces:\n    - name: shared-data\n      emptyDir: {}\nEOF\n\necho \"Created scip-sync TaskRun for ${KB_NAME}\""
         }
       ]
     },
@@ -33,5 +37,5 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string) []byte {
       {"name": "repo-url", "value": "$(tt.params.repo-url)"}
     ]
   }
-}`, namespace, repoMappingConfigMapName, orgNamespace))
+}`, namespace, constants.EventTaskResolverServiceAccount, repoMappingConfigMapName, orgNamespace, constants.EventTaskResolverServiceAccount))
 }

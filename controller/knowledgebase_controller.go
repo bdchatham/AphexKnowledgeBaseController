@@ -51,6 +51,8 @@ type KnowledgeBaseReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;create
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;create;update;delete
 
 // Reconcile manages KnowledgeBase resources
 func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocyclo
@@ -341,6 +343,21 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "repo_mapping", "success")
 
+	if err := r.reconcileResolveRBAC(ctx, kb); err != nil {
+		logger.Error(err, "Failed to reconcile resolve RBAC")
+		timer.ObserveError(metrics.ClassifyError(err))
+		metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "resolve_rbac", "error")
+		if patchErr := r.statusHelper.PatchStatus(ctx, kb, map[string]interface{}{
+			"phase":             constants.PhaseFailed,
+			"message":           fmt.Sprintf("Resolve RBAC provisioning failed: %v", err),
+			"lastReconcileTime": metav1.Now().Format(time.RFC3339),
+		}); patchErr != nil {
+			logger.Error(patchErr, "Failed to update status after resolve RBAC failure")
+		}
+		return ctrl.Result{}, err
+	}
+	metricsCollector.RecordProvisioningStep(constants.ControllerNameKnowledgeBase, "resolve_rbac", "success")
+
 	if err := r.reconcileTriggerTemplate(ctx, kb); err != nil {
 		logger.Error(err, "Failed to reconcile TriggerTemplate")
 		timer.ObserveError(metrics.ClassifyError(err))
@@ -538,6 +555,9 @@ func (r *KnowledgeBaseReconciler) handleDeletionWithHelper(ctx context.Context, 
 		}),
 		helpers.NewCleanupStep("Triggers", func(ctx context.Context) error {
 			return r.cleanupTriggers(ctx, kb)
+		}),
+		helpers.NewCleanupStep("Resolve RBAC", func(ctx context.Context) error {
+			return r.cleanupResolveRBAC(ctx, kb)
 		}),
 		helpers.NewCleanupStep("MCP server resources", func(ctx context.Context) error {
 			return r.cleanupMCPServerResources(ctx, kb)
