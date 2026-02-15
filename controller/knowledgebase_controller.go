@@ -505,6 +505,10 @@ func (r *KnowledgeBaseReconciler) validateSpec(kb *platformv1alpha1.KnowledgeBas
 		}
 	}
 
+	if hasCodeSources(kb.Spec.Sources) && kb.Spec.Agent == nil {
+		return fmt.Errorf("agent configuration is required when any source has sourceType 'code'")
+	}
+
 	return nil
 }
 
