@@ -55,7 +55,7 @@ func (r *KnowledgeBaseReconciler) reconcileResolveRBAC(ctx context.Context, kb *
 		Subjects: []rbacv1.Subject{{
 			Kind:      "ServiceAccount",
 			Name:      constants.EventTaskResolverServiceAccount,
-			Namespace: orgNamespace(kb),
+			Namespace: kbNS,
 		}},
 	}
 
