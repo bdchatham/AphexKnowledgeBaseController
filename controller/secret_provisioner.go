@@ -37,6 +37,40 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 	obj.SetNamespace(infraNamespace(kb))
 	obj.SetLabels(externalSecretLabels(kb))
 
+	data := []interface{}{
+		map[string]interface{}{
+			"secretKey": "github_token",
+			"remoteRef": map[string]interface{}{
+				"key":      OrgSecretsRemoteKey,
+				"property": "github-token",
+			},
+		},
+		map[string]interface{}{
+			"secretKey": "postgres_user",
+			"remoteRef": map[string]interface{}{
+				"key":      OrgSecretsRemoteKey,
+				"property": "postgres-user",
+			},
+		},
+		map[string]interface{}{
+			"secretKey": "postgres_password",
+			"remoteRef": map[string]interface{}{
+				"key":      OrgSecretsRemoteKey,
+				"property": "postgres-password",
+			},
+		},
+	}
+
+	if kb.Spec.Agent != nil {
+		data = append(data, map[string]interface{}{
+			"secretKey": "agent_api_key",
+			"remoteRef": map[string]interface{}{
+				"key":      OrgSecretsRemoteKey,
+				"property": "agent-api-key",
+			},
+		})
+	}
+
 	obj.Object["spec"] = map[string]interface{}{
 		"refreshInterval": ExternalSecretRefreshInterval,
 		"secretStoreRef": map[string]interface{}{
@@ -47,29 +81,7 @@ func buildExternalSecret(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstr
 			"name":           name,
 			"creationPolicy": "Owner",
 		},
-		"data": []interface{}{
-			map[string]interface{}{
-				"secretKey": "github_token",
-				"remoteRef": map[string]interface{}{
-					"key":      OrgSecretsRemoteKey,
-					"property": "github-token",
-				},
-			},
-			map[string]interface{}{
-				"secretKey": "postgres_user",
-				"remoteRef": map[string]interface{}{
-					"key":      OrgSecretsRemoteKey,
-					"property": "postgres-user",
-				},
-			},
-			map[string]interface{}{
-				"secretKey": "postgres_password",
-				"remoteRef": map[string]interface{}{
-					"key":      OrgSecretsRemoteKey,
-					"property": "postgres-password",
-				},
-			},
-		},
+		"data": data,
 	}
 
 	return obj
