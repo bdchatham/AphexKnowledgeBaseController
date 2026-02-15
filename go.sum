@@ -52,6 +52,8 @@ github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215005754-7c4e4c385bb6
 github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215005754-7c4e4c385bb6/go.mod h1:Cv81ookMnmy2wWLjm8yrmxYYL6qzEwVCvVdfssgRz8Q=
 github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215174558-fd3b48071bc8 h1:P6mXwbzYvt/KDVKy3yIGXkqkFRu6hVKtmTfuqHHKUQQ=
 github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215174558-fd3b48071bc8/go.mod h1:Cv81ookMnmy2wWLjm8yrmxYYL6qzEwVCvVdfssgRz8Q=
+github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215174911-ad1e3175c67d h1:eN93uKwSZWGc0+yupno2lEFlsNlsrDXr7cjD/f6r1Rg=
+github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215174911-ad1e3175c67d/go.mod h1:Cv81ookMnmy2wWLjm8yrmxYYL6qzEwVCvVdfssgRz8Q=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

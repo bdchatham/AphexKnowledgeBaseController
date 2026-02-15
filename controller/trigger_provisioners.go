@@ -64,7 +64,7 @@ func buildTriggerTemplate(name, namespace string, kb *platformv1alpha1.Knowledge
 			ResourceTemplates: []triggersv1beta1.TriggerResourceTemplate{
 				{
 					RawExtension: runtime.RawExtension{
-						Raw: buildResolveAndTriggerTaskRun(namespace, orgNamespace(kb)),
+						Raw: buildResolveAndTriggerTaskRun(namespace, orgNamespace(kb), kb),
 					},
 				},
 			},
