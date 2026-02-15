@@ -11,7 +11,7 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string, kb *platformv
 	agentSecret := ""
 	agentModel := ""
 	if kb.Spec.Agent != nil {
-		agentSecret = kb.Spec.Agent.ApiKeySecretName
+		agentSecret = kb.Spec.Agent.APIKeySecretName
 		agentModel = kb.Spec.Agent.Model
 	}
 

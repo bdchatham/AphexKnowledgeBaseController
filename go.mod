@@ -3,7 +3,7 @@ module github.com/bdchatham/AphexKnowledgeBaseController
 go 1.25.1
 
 require (
-	github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215174911-ad1e3175c67d
+	github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215175903-13f50adf3af1
 	github.com/go-logr/logr v1.4.3
 	github.com/tektoncd/pipeline v1.6.0
 	github.com/tektoncd/triggers v0.34.0
