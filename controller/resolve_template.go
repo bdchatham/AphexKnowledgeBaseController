@@ -34,7 +34,7 @@ func buildResolveAndTriggerTaskRun(namespace, orgNamespace string) []byte {
       ]
     },
     "params": [
-      {"name": "repo-url", "value": "$(tt.params.repo-url)"}
+      {"name": "repo-url", "value": "$(tt.params.git-url)"}
     ]
   }
 }`, namespace, constants.EventTaskResolverServiceAccount, repoMappingConfigMapName, orgNamespace, constants.EventTaskResolverServiceAccount))

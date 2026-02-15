@@ -57,8 +57,8 @@ func buildTriggerTemplate(name, namespace string, kb *platformv1alpha1.Knowledge
 		},
 		Spec: triggersv1beta1.TriggerTemplateSpec{
 			Params: []triggersv1beta1.ParamSpec{
-				{Name: "repo-url", Description: "Repository clone URL from push event"},
-				{Name: "ref", Description: "Git ref from push event"},
+				{Name: "git-url", Description: "Repository clone URL from push event"},
+				{Name: "git-revision", Description: "Git ref from push event"},
 				{Name: "repo-full-name", Description: "Repository full name (org/repo)"},
 			},
 			ResourceTemplates: []triggersv1beta1.TriggerResourceTemplate{
