@@ -210,5 +210,3 @@ func httpRouteName(kb *platformv1alpha1.KnowledgeBase) string {
 func secretStoreName(kb *platformv1alpha1.KnowledgeBase) string {
 	return fmt.Sprintf("org-%s-store", kb.Spec.Organization)
 }
-
-
