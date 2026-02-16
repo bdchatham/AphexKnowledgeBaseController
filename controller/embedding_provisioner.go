@@ -74,8 +74,9 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 									corev1.ResourceCPU:    mustParseQuantity(EmbeddingCPURequest),
 								},
 								Limits: corev1.ResourceList{
-									corev1.ResourceMemory: mustParseQuantity(EmbeddingMemoryLimit),
-									corev1.ResourceCPU:    mustParseQuantity(EmbeddingCPULimit),
+									corev1.ResourceMemory:                    mustParseQuantity(EmbeddingMemoryLimit),
+									corev1.ResourceCPU:                       mustParseQuantity(EmbeddingCPULimit),
+									corev1.ResourceName("nvidia.com/gpu"):    mustParseQuantity(EmbeddingGPULimit),
 								},
 							},
 							LivenessProbe: &corev1.Probe{
@@ -87,7 +88,8 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 								},
 								InitialDelaySeconds: 30,
 								PeriodSeconds:       30,
-								FailureThreshold:    3,
+								TimeoutSeconds:      10,
+								FailureThreshold:    6,
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{

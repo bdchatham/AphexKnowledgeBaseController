@@ -27,6 +27,7 @@ const (
 	EmbeddingMemoryLimit   = "4Gi"
 	EmbeddingCPURequest    = "500m"
 	EmbeddingCPULimit      = "2000m"
+	EmbeddingGPULimit      = "1"
 	EmbeddingModel         = "BAAI/bge-base-en-v1.5"
 
 	// Query service
