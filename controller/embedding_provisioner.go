@@ -44,6 +44,7 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					RuntimeClassName: stringPtr("nvidia"),
 					Containers: []corev1.Container{
 						{
 							Name:  "embedding",
