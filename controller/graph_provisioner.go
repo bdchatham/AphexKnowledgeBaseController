@@ -47,8 +47,9 @@ func buildGraphDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deployment
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "graph",
-							Image: GraphImage,
+							Name:            "graph",
+							Image:           GraphImage,
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",

@@ -47,8 +47,9 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 					RuntimeClassName: stringPtr("nvidia"),
 					Containers: []corev1.Container{
 						{
-							Name:  "embedding",
-							Image: EmbeddingImage,
+							Name:            "embedding",
+							Image:           EmbeddingImage,
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
