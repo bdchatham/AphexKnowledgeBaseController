@@ -36,6 +36,7 @@ func buildEmbeddingDeployment(kb *platformv1alpha1.KnowledgeBase) *appsv1.Deploy
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
+			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
