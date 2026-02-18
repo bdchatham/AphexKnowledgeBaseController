@@ -62,6 +62,8 @@ const (
 	PlatformGatewayName        = "platform-gateway"
 	PlatformGatewayNamespace   = "kube-system"
 	PlatformGatewaySectionName = "https"
+	PlatformAPISectionName     = "api"
+	PlatformAPIDomain          = "aphex.arbiter-dev.com"
 
 	// ExternalSecret configuration
 	ExternalSecretRefreshInterval = "1h"

@@ -953,6 +953,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 	kb.Status.MCP.Deployed = true
 	kb.Status.MCP.ServiceName = serviceName
 	kb.Status.MCP.ServiceURL = fmt.Sprintf("http://%s.%s:%d", serviceName, infraNamespace(kb), port)
+	kb.Status.MCP.ExternalURL = fmt.Sprintf("https://%s/mcp/%s", PlatformAPIDomain, kb.Name)
 	if existingDeployment.Status.ReadyReplicas > 0 {
 		kb.Status.MCP.ReadyReplicas = existingDeployment.Status.ReadyReplicas
 	}
