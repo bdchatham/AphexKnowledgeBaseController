@@ -3,8 +3,9 @@ module github.com/bdchatham/AphexKnowledgeBaseController
 go 1.25.1
 
 require (
-	github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260218032138-b563d5ab27b9
+	github.com/bdchatham/AphexControllerRuntime v0.2.1-0.20260215213903-b31e84a9a785
 	github.com/go-logr/logr v1.4.3
+	github.com/tektoncd/pipeline v1.6.0
 	github.com/tektoncd/triggers v0.34.0
 	k8s.io/api v0.34.1
 	k8s.io/apiextensions-apiserver v0.34.1
@@ -58,7 +59,6 @@ require (
 	github.com/prometheus/statsd_exporter v0.22.7 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
-	github.com/tektoncd/pipeline v1.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
