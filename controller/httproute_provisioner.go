@@ -34,25 +34,43 @@ func buildHTTPRoute(kb *platformv1alpha1.KnowledgeBase) *unstructured.Unstructur
 	obj.SetName(httpRouteName(kb))
 	obj.SetNamespace(infraNamespace(kb))
 	obj.SetLabels(httpRouteLabels(kb))
+	obj.SetAnnotations(map[string]string{
+		"konghq.com/strip-path": "true",
+		"konghq.com/plugins":    "mcp-rate-limit,mcp-key-auth",
+	})
 
 	obj.Object["spec"] = map[string]interface{}{
 		"parentRefs": []interface{}{
 			map[string]interface{}{
 				"name":        PlatformGatewayName,
 				"namespace":   PlatformGatewayNamespace,
-				"sectionName": PlatformGatewaySectionName,
+				"sectionName": PlatformAPISectionName,
 			},
 		},
-		"hostnames": []interface{}{
-			fmt.Sprintf("%s.home.local", kb.Name),
-		},
+		"hostnames": []interface{}{PlatformAPIDomain},
 		"rules": []interface{}{
 			map[string]interface{}{
 				"matches": []interface{}{
 					map[string]interface{}{
 						"path": map[string]interface{}{
 							"type":  "PathPrefix",
-							"value": "/",
+							"value": fmt.Sprintf("/mcp/%s", kb.Name),
+						},
+					},
+				},
+				"backendRefs": []interface{}{
+					map[string]interface{}{
+						"name": fmt.Sprintf("mcp-server-%s", kb.Name),
+						"port": int64(kb.Spec.MCP.Port),
+					},
+				},
+			},
+			map[string]interface{}{
+				"matches": []interface{}{
+					map[string]interface{}{
+						"path": map[string]interface{}{
+							"type":  "PathPrefix",
+							"value": fmt.Sprintf("/query/%s", kb.Name),
 						},
 					},
 				},
