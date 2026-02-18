@@ -449,6 +449,7 @@ func (r *KnowledgeBaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			"deployed":      kb.Status.MCP.Deployed,
 			"serviceName":   kb.Status.MCP.ServiceName,
 			"serviceURL":    kb.Status.MCP.ServiceURL,
+			"externalURL":   kb.Status.MCP.ExternalURL,
 			"readyReplicas": kb.Status.MCP.ReadyReplicas,
 		}
 	}
