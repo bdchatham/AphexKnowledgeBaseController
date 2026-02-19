@@ -770,7 +770,7 @@ func (r *KnowledgeBaseReconciler) reconcileMCPServer(ctx context.Context, kb *pl
 
 	queryServiceURL := kb.Spec.MCP.QueryServiceURL
 	if queryServiceURL == "" {
-		queryServiceURL = fmt.Sprintf("http://query.%s:8080", infraNamespace(kb))
+		queryServiceURL = fmt.Sprintf("http://%s.%s:8080", queryServiceName(kb), infraNamespace(kb))
 	}
 
 	replicas := kb.Spec.MCP.Replicas
